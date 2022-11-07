@@ -1,0 +1,15 @@
+{
+  "connection": {
+    "address_list": [
+      {
+        "address": "192.168.199.235",
+        "port": "27017"
+      }
+    ]
+  },
+  "database": "default_database",
+  "message_collection": "message",
+  "queue_collection": "queue",
+  "user_info_collection": "user_info",
+  "group_info_collection": "group_info"
+}

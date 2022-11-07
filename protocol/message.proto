@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+option go_package="./protocol";
+
+message ErrorResponse {
+  string reason = 1;
+}
+
+message Message {
+  fixed64 id = 1;
+  sfixed64 sender = 2;
+  sfixed64 receiver = 3;
+  fixed64 timestamp = 4;
+
+  enum contentType {
+      Text = 0;
+      Image = 1;
+      Emoji = 2;
+  }
+  contentType type = 5;
+  repeated string contents = 6;
+}
+
+message RequestMessage {
+  fixed64 id = 1;
+  sfixed64 receiver = 2;
+}
+
+message MultiMessage {
+  repeated Message messages = 1;
+}
+
+message RequestMultiMessage {
+  fixed64 bottomId = 1;
+  fixed64 topId = 2;
+  sfixed64 receiver = 3;
+}
+
+message RequestEstablishConnection {
+  string token = 1;
+}
+
+message ResponseEstablishConnection {
+  repeated sfixed64 privateChat = 1;
+  repeated sfixed64 groupChat = 2;
+}

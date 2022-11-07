@@ -1,0 +1,12 @@
+{
+  "address_list": [
+    {
+      "address": "192.168.199.235",
+      "port": "3306",
+      "username": "root",
+      "password": "password"
+    }
+  ],
+  "db": "default_database",
+  "user_info_table": "user_info"
+}
