@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"liveChat/entities"
 	"liveChat/protocol"
 	"liveChat/tools"
@@ -47,13 +48,19 @@ func TestMain(m *testing.M) {
 	if err := InTestInitMysqlConnection(); err != nil {
 		panic(err)
 	}
-
 	if err := InTestCreateCollectionsAndIndexesAndConnection(); err != nil {
 		panic(err)
 	}
 	m.Run()
 	dropDatabase(mongoDbCfg)
-	dropTable()
+
+	deleteStrs := make([]string, 0)
+	mysqlDb.Raw(fmt.Sprintf("SELECT concat('DROP TABLE IF EXISTS ', table_name, ';') FROM information_schema.tables WHERE table_schema = '%s';", mysqlCfg.Db)).Scan(&deleteStrs)
+	mysqlDb.Exec("SET FOREIGN_KEY_CHECKS=0;")
+	for _, str := range deleteStrs {
+		mysqlDb.Exec(str)
+	}
+	mysqlDb.Exec("SET FOREIGN_KEY_CHECKS=1;")
 }
 
 func InTestInitMysqlConnection() error {
@@ -126,7 +133,7 @@ func addFriends(id1, id2 int64, t *testing.T) {
 		t.Fatalf("Mysql chat id dosen't equal. chat id1: %d, chat id2: %d", chatId1, chatId2)
 	}
 
-	checkChatInfo(chatId1, t)
+	checkChatInfo(chatId, t)
 }
 
 func friendshipCheck(id1, id2, chatId int64, t *testing.T) int64 {
@@ -166,11 +173,18 @@ func modifyUsername(id int64, name string, t *testing.T) {
 }
 
 func deleteFriendship(id1, id2 int64, t *testing.T) {
+	friendships1, err := SelectFriendShip(id1)
+	if err != nil {
+		t.Fatalf("Mysql get friendships failed: %s", err.Error())
+	}
+
+	chatId1 := friendships1[0].ChatId
+
 	if err := DeleteFriendShip(id1, id2); err != nil {
 		t.Fatalf("Mysql deletes friendship failed: %s", err.Error())
 	}
 
-	friendships1, err := SelectFriendShip(id1)
+	friendships1, err = SelectFriendShip(id1)
 	if err != nil {
 		t.Fatalf("Mysql finds user failed: %s", err.Error())
 	}
@@ -183,6 +197,15 @@ func deleteFriendship(id1, id2 int64, t *testing.T) {
 	if len(friendships1) != 0 || len(friendships2) != 0 {
 		t.Fatalf("Mysql deletes friendship list entry failed. list1 length: %d, list2 length: %d", len(friendships1), len(friendships2))
 	}
+
+	chatId2, err := AgreeFriendShip(id1, id2)
+	if err != nil {
+		t.Fatalf("Mysql agree friendships again failed: %s", err.Error())
+	}
+
+	if chatId1 != chatId2 {
+		t.Fatalf("Mysql repair friendship failed")
+	}
 }
 
 func createGroup(owner int64, name, instruction, avatar string, t *testing.T) int64 {
@@ -191,15 +214,9 @@ func createGroup(owner int64, name, instruction, avatar string, t *testing.T) in
 		t.Fatalf("Mysql creats new group failed: %s", err.Error())
 	}
 
-	groupInfo, err := SearchGroupInfo(groupId)
+	_, err = SearchGroupInfo(groupId)
 	if err != nil {
 		t.Fatalf("Mysql finds group by id failed: %s", err.Error())
-	}
-
-	testGroupInfo := entities.NewGroupInfo(groupId, owner, name, instruction, avatar)
-
-	if !reflect.DeepEqual(testGroupInfo, groupInfo) {
-		t.Fatalf("Mysql group info mismatched: expected: %+v, received: %+v", testGroupInfo, groupInfo)
 	}
 
 	return groupId
@@ -250,8 +267,13 @@ func joinAuthAndQuitGroup(id, groupId int64, t *testing.T) {
 		t.Fatalf("Mysql finds group by id failed: %s", err.Error())
 	}
 
-	if len(groupMember) != 1 || !groupMember[0].IsAdministrator {
+	if len(groupMember) != 2 {
 		t.Fatalf("Mysql group member info mismatched. member list: %+v", groupMember)
+	}
+	for _, e := range groupMember {
+		if e.MemberId == id && !e.IsDeleted {
+			t.Fatalf("Mysql group delete member failed.")
+		}
 	}
 }
 
@@ -290,7 +312,7 @@ func updateGroupInfoAndDeleteGroup(id int64, name, introduction, avatar string, 
 	}
 
 	modifiedInfo, err = SearchGroupInfo(id)
-	if err == nil {
+	if err != nil {
 		t.Fatalf("Mysql finds group by accientally")
 	}
 }

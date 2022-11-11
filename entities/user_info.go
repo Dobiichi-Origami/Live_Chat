@@ -16,10 +16,13 @@ var (
 )
 
 type UserInfo struct {
-	Id               int64  `bson:"id"`
-	Username         string `bson:"username"`
+	Id               int64 `gorm:"primaryKey"`
+	Username         string
 	UserAvatar       string
 	UserIntroduction string
+
+	Friendships []Friendship  `gorm:"foreignKey:SelfId"`
+	Groups      []GroupMember `gorm:"foreignKey:MemberId"`
 }
 
 func NewUserInfo(id int64, userName string) *UserInfo {
@@ -29,8 +32,23 @@ func NewUserInfo(id int64, userName string) *UserInfo {
 	}
 }
 
+func NewUserInfoWithDefaultValue(id int64) *UserInfo {
+	return &UserInfo{
+		Id:               id,
+		Username:         DefaultUserName,
+		UserAvatar:       DefaultUserAvatar,
+		UserIntroduction: DefaultUserIntroduction,
+
+		Friendships: make([]Friendship, 0, 0),
+		Groups:      make([]GroupMember, 0, 0),
+	}
+}
+
 func NewEmptyUserInfo() *UserInfo {
-	return &UserInfo{}
+	return &UserInfo{
+		Friendships: make([]Friendship, 0, 0),
+		Groups:      make([]GroupMember, 0, 0),
+	}
 }
 
 func ScanUserInfoFromSqlResult(rows *sql.Rows) (*UserInfo, error) {

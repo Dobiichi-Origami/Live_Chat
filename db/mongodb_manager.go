@@ -55,22 +55,6 @@ const (
 )
 
 const (
-	UserId          = "id"
-	UserName        = "username"
-	UserFriendShip  = "friendship"
-	UserPrivateChat = "private_chat"
-	UserGroup       = "group"
-
-	GroupId            = "id"
-	GroupAdministrator = "administrator"
-	GroupMember        = "member"
-	GroupName          = "name"
-	GroupInstruction   = "instruction"
-	GroupAvatar        = "avatar"
-
-	PrivateChatId      = "id"
-	PrivateChatMembers = "members"
-
 	ChatId       = "id"
 	ChatSequence = "sequence"
 
@@ -262,7 +246,8 @@ func findDocumentOne(ctx context.Context, filter bson.D, collection *mongo.Colle
 }
 
 func addChat(ctx context.Context, chatId int64) error {
-	return insertDocumentOne(ctx, entities.NewChat(chatId, 0), queueCollection)
+	_, err := queueCollection.UpdateOne(ctx, getBson("id", chatId), getOpBson(mongoDbSetInInsert, "sequence", 0), (&options.UpdateOptions{}).SetUpsert(true))
+	return err
 }
 
 func execTransaction(sess mongo.Session, hook func(sessCtx mongo.SessionContext) error) error {

@@ -21,6 +21,6 @@ func NewEmptyChat() *Chat {
 func NewChatFromChangeStreamBson(data bson.D) *Chat {
 	return &Chat{
 		Id:       data[1].Value.(int64),
-		Sequence: uint64(data[2].Value.(int64)),
+		Sequence: uint64(data[2].Value.(int32)),
 	}
 }

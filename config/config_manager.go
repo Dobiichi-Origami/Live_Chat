@@ -165,6 +165,12 @@ func NewMysqlConfig(path string) *MysqlConfig {
 }
 
 func (cfg *MysqlConfig) Format() string {
+	if cfg.ConnectionOptions == nil {
+		cfg.ConnectionOptions = make(map[string]string)
+	}
+
+	cfg.ConnectionOptions["parseTime"] = "true"
+
 	builder := strings.Builder{}
 	builder.Grow(128)
 
