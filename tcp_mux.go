@@ -53,11 +53,11 @@ func (engine *engineImplementation) OnClose(c gnet.Conn, err error) (action gnet
 		if info, err := db.SearchUserInfo(userId); err != nil {
 			log.Error(fmt.Sprintf("尝试删除消息监听失败: %s", err.Error()))
 		} else {
-			for _, id := range info.PrivateChat {
-				controllers.DeleteSubscribe(id, userId)
+			for _, friendship := range info.Friendships {
+				controllers.DeleteSubscribe(friendship.ChatId, userId)
 			}
-			for _, id := range info.Group {
-				controllers.DeleteSubscribe(id, userId)
+			for _, group := range info.Groups {
+				controllers.DeleteSubscribe(group.GroupId, userId)
 			}
 		}
 	}

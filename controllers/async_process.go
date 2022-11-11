@@ -136,9 +136,19 @@ func requestAsyncHandler(arg interface{}) {
 			return
 		}
 
+		privateChatIds := make([]int64, len(userInfo.Friendships), len(userInfo.Friendships))
+		for _, friendships := range userInfo.Friendships {
+			privateChatIds = append(privateChatIds, friendships.ChatId)
+		}
+
+		groupChatIds := make([]int64, len(userInfo.Groups), len(userInfo.Groups))
+		for _, group := range userInfo.Groups {
+			groupChatIds = append(groupChatIds, group.GroupId)
+		}
+
 		resp := protocol.ResponseEstablishConnection{}
-		resp.PrivateChat = Subscribe(userInfo.PrivateChat, userId)
-		resp.GroupChat = Subscribe(userInfo.Group, userId)
+		resp.PrivateChat = Subscribe(privateChatIds, userId)
+		resp.GroupChat = Subscribe(groupChatIds, userId)
 
 		ret, err := proto.Marshal(&resp)
 		if err != nil {

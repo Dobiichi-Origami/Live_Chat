@@ -49,14 +49,8 @@ var (
 		UserInfoTable:     "user_info",
 	}
 
-	targetMysqlUrl = fmt.Sprintf("root:password@tcp(%s:3306)/default_database", localTestBenchAddress)
+	targetMysqlUrl = fmt.Sprintf("root:password@tcp(%s:3306)/default_database?parseTime=true", localTestBenchAddress)
 )
-
-func TestMysqlConstruction(t *testing.T) {
-	if targetMysqlUrl != intendedMysqlDbConfig.Format() {
-		t.Errorf(formatErrorInfo("generated mysql connection url mismatched", targetMysqlUrl, intendedMysqlDbConfig.Format()))
-	}
-}
 
 func TestMysqlConfigRead(t *testing.T) {
 	path := "../default_config_files/default_mysql_config.json"
@@ -64,6 +58,12 @@ func TestMysqlConfigRead(t *testing.T) {
 
 	if !reflect.DeepEqual(*config, intendedMysqlDbConfig) {
 		t.Errorf(formatErrorInfo("read mysql config mismatched", intendedMysqlDbConfig, *config))
+	}
+}
+
+func TestMysqlConstruction(t *testing.T) {
+	if targetMysqlUrl != intendedMysqlDbConfig.Format() {
+		t.Errorf(formatErrorInfo("generated mysql connection url mismatched", targetMysqlUrl, intendedMysqlDbConfig.Format()))
 	}
 }
 

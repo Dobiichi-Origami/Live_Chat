@@ -29,10 +29,6 @@ var (
 	messageCollection *mongo.Collection = nil
 	// 存放所有会话最新消息序号的集合对象
 	queueCollection *mongo.Collection = nil
-	// 存放所有用户信息的集合对象
-	userInfoCollection *mongo.Collection = nil
-	// 存放所有聊天信息的集合对象
-	chatInfoCollection *mongo.Collection = nil
 
 	isMongodbInitiated bool = false
 )
@@ -218,20 +214,6 @@ func insertDocumentOne(ctx context.Context, obj interface{}, collection *mongo.C
 	return nil
 }
 
-func updateDocumentOne(ctx context.Context, filter, update bson.D, collection *mongo.Collection) error {
-	result, err := collection.UpdateOne(ctx, filter, update, nil)
-	if err != nil {
-		return err
-	}
-
-	if result.ModifiedCount == 0 {
-		err = mongo.ErrNoDocuments
-		return err
-	}
-
-	return nil
-}
-
 func findDocumentOne(ctx context.Context, filter bson.D, collection *mongo.Collection, container interface{}) error {
 	result := collection.FindOne(ctx, filter, nil)
 	if result.Err() != nil {
@@ -267,17 +249,6 @@ func execTransaction(sess mongo.Session, hook func(sessCtx mongo.SessionContext)
 	return nil
 }
 
-func execTransactionWithRetry(sess mongo.Session, hook func(sessCtx mongo.SessionContext) error) error {
-	err := execTransaction(sess, hook)
-	for i := 1; i < 3 && err != nil; i++ {
-		err = execTransaction(sess, hook)
-	}
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func errorWhenTransactionGoing(sess mongo.Session, sessCtx mongo.SessionContext, err error) error {
 	if errAbort := sess.AbortTransaction(sessCtx); errAbort != nil {
 		return fmt.Errorf("2 errors in transaction.\n1: %s\n2: %s\n", err.Error(), errAbort.Error())
@@ -297,8 +268,6 @@ func initConnection(cfg *config.MongoDBConfig) {
 	db := mongoConnection.Database(cfg.Database)
 	messageCollection = db.Collection(cfg.MessageCollection)
 	queueCollection = db.Collection(cfg.QueueCollection)
-	userInfoCollection = db.Collection(cfg.UserInfoCollection)
-	chatInfoCollection = db.Collection(cfg.GroupInfoCollection)
 
 }
 
@@ -357,12 +326,4 @@ func getBson(key string, val interface{}) bson.D {
 
 func getOpBson(op, key string, val interface{}) bson.D {
 	return bson.D{{op, bson.D{{key, val}}}}
-}
-
-func getOpBsonEWithMultiKV(op string, key []string, val []interface{}) bson.E {
-	valSlice := make(bson.D, 0, len(key))
-	for i, k := range key {
-		valSlice = append(valSlice, bson.E{Key: k, Value: val[i]})
-	}
-	return bson.E{Key: op, Value: valSlice}
 }
