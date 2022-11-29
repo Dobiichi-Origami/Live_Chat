@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+option go_package="./rpc";
+import "cs_message.proto";
+
+message Response {
+  fixed64 requestId = 1;
+  bool isProcessedByOneSelf = 2;
+  bool isSucceeded = 3;
+  string failureReason = 4;
+}
+
+message KickOffRequest {
+  fixed64 requestId = 1;
+  sfixed64 userId = 2;
+  enum PlatformType {
+    Web = 0;
+    Android = 1;
+  }
+  PlatformType platform = 3;
+}
+
+message NotificationRequest {
+  fixed64 requestId = 1;
+  fixed64 id = 2;
+  sfixed64 sender = 3;
+  sfixed64 receiver = 4;
+  fixed64 timestamp = 5;
+
+  enum OpType {
+    Add = 0;
+    Delete = 1;
+  }
+  OpType op = 6;
+
+  enum ReceiveType {
+    User = 0;
+    Group = 1;
+    Administrator = 2;
+  }
+  ReceiveType receiveType = 7;
+
+  bool isHandledByAuth = 8;
+  bool isAgree = 9;
+}
+
+message MessageRequest {
+  fixed64 requestId = 1;
+  Message message = 2;
+}
+
+service ServerNode {
+  rpc KickUserOffOnSpecificPlatform(KickOffRequest) returns (Response) {}
+  rpc BroadcastNotification(NotificationRequest) returns (Response) {}
+  rpc BroadcastMessage(MessageRequest) returns (Response) {}
+}

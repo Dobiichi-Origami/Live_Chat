@@ -43,22 +43,20 @@ func (sc *ThreadSafeContainer) Set(key int64, val interface{}) {
 	}
 }
 
-func (sc *ThreadSafeContainer) Get(key int64) interface{} {
+func (sc *ThreadSafeContainer) Get(key int64) (interface{}, bool) {
 	sc.lock()
 	defer sc.unlock()
 
 	if !sc.isOping.Load() {
-		ret, _ := sc.iContainer0.getValueFromBucket(key)
-		return ret
+		return sc.iContainer0.getValueFromBucket(key)
 	}
 
 	ret, ok := sc.iContainer0.getValueFromBucket(key)
 	if ok {
-		return ret
+		return ret, true
 	}
 
-	ret, _ = sc.iContainer1.getValueFromBucket(key)
-	return ret
+	return sc.iContainer1.getValueFromBucket(key)
 }
 
 func (sc *ThreadSafeContainer) Delete(key int64) bool {
@@ -166,7 +164,7 @@ func rehashDataToNewBucket(oldBucket, newBucket *internalContainer) {
 }
 
 const (
-	minimumInitialBucketNumber = 1 << 10
+	minimumInitialBucketNumber = 1 << 4
 	pow2ExpansionLimitSize     = 1 << 20
 	limitExpansionCapacity     = 1 << 18
 

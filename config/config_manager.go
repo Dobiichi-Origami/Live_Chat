@@ -68,12 +68,7 @@ type MongoDBConnectionConfig struct {
 
 type MongoDBConfig struct {
 	Connection MongoDBConnectionConfig `json:"connection"`
-
-	Database            string `json:"database"`
-	MessageCollection   string `json:"message_collection"`
-	QueueCollection     string `json:"queue_collection"`
-	UserInfoCollection  string `json:"user_info_collection"`
-	GroupInfoCollection string `json:"group_info_collection"`
+	Database   string                  `json:"database"`
 }
 
 func NewMongoDBConfig(path string) *MongoDBConfig {
@@ -144,18 +139,16 @@ func (cfg *RedisConfig) Format() string {
 
 // Mysql Config
 const (
-	mysqlProtocolHead = "mysql://"
-	mysqlAddressCon   = '@'
-	mysqlAuthCon      = ':'
-	mysqlOptionsSep   = '&'
-	mysqlOptionsCon   = '='
+	mysqlAddressCon = '@'
+	mysqlAuthCon    = ':'
+	mysqlOptionsSep = '&'
+	mysqlOptionsCon = '='
 )
 
 type MysqlConfig struct {
 	AddressList       AddressPortInfo   `json:"address_list"`
 	ConnectionOptions map[string]string `json:"connection_options,omitempty"`
 	Db                string            `json:"db"`
-	UserInfoTable     string            `json:"user_info_table"`
 }
 
 func NewMysqlConfig(path string) *MysqlConfig {

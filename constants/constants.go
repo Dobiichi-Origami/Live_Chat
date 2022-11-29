@@ -19,10 +19,11 @@ const (
 	RequestMultiMessageLoad
 	RequestEstablishConnectionLoad
 	ResponseEstablishConnectionLoad
+	NotificationRequestLoad
 
 	HeartBeatLoad
 	HeartBeatResponse
 )
 
 const HeartBeatMaxInterval = 180
-const KeepAlivePeriod = time.Minute * 4
+const KeepAlivePeriod = time.Second * 15

@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
-	"fmt"
+	"crypto/md5"
+	"encoding/json"
+	"errors"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/atomic"
 	"liveChat/config"
@@ -19,12 +21,15 @@ var RedisConfigPath = defaultRedisConfigPath
 var (
 	redisConnection *redis.Client = nil
 
-	ChatIdTimeOut       = time.Hour * 30
-	ChatIdLockTimeOut   = time.Second * 10
-	MessageCacheTimeOut = time.Hour * 1
+	tokenTimeOut           = time.Hour
+	redisLockTimeOut       = time.Second * 10
+	messageCacheTimeOut    = time.Hour
+	friendshipCacheTimeOut = time.Hour * 24
 
 	isRedisInitiated = false
 )
+
+var RedisNoResultError = errors.New("Redis 内不存在值")
 
 func InitRedisConnection(configPath string) error {
 	if isRedisInitiated {
@@ -56,17 +61,14 @@ func CacheMessageWithTimeOut(m *entities.Message) error {
 	if err != nil {
 		return err
 	}
-	if cmd := redisConnection.SetEX(context.Background(), key, val, MessageCacheTimeOut); cmd.Err() != nil {
-		return cmd.Err()
-	}
-	return nil
+	return redisConnection.SetEX(context.Background(), key, val, messageCacheTimeOut).Err()
 }
 
 func FetchMessageCache(chatId int64, seq uint64) (*entities.Message, error) {
 	key := getCacheMessageKey(chatId, seq)
-	ret := redisConnection.GetEx(context.Background(), key, MessageCacheTimeOut)
+	ret := redisConnection.GetEx(context.Background(), key, messageCacheTimeOut)
 	if ret.Err() != nil {
-		return nil, ret.Err()
+		return nil, returnNilForRedisNil(ret.Err())
 	}
 
 	result, err := ret.Result()
@@ -81,75 +83,90 @@ func FetchMessageCache(chatId int64, seq uint64) (*entities.Message, error) {
 	return message, nil
 }
 
-func getCacheMessageKey(chatId int64, seq uint64) string {
-	return strconv.FormatInt(chatId, 10) + "_" + strconv.FormatUint(seq, 10)
+var (
+	luaScriptAtomicCheckAndSetToken = redis.NewScript(luaScriptAtomicCheckAndSetExpiringTxt)
+	luaScriptAtomicCheckToken       = redis.NewScript(luaScriptAtomicCheckAndResetTxt)
+)
+
+func RedisSetAndCheckTimeoutToken(token string, userId int64) (string, error) {
+	cmd := luaScriptAtomicCheckAndSetToken.Run(context.Background(), redisConnection, []string{token}, userId, tokenTimeOut/time.Second)
+	return cmd.String(), cmd.Err()
 }
 
-const (
-	luaScriptAtomicSetAndIncrChatSeqTxt = `
-local chatId = KEYS[1]
-local seq = ARGV[1]
+func RedisCheckAndResetToken(token string) (int64, error) {
+	result, err := luaScriptAtomicCheckToken.Run(context.Background(), redisConnection, []string{token}, tokenTimeOut/time.Second).Int64()
+	if err != nil {
+		return -1, err
+	}
+	return result, nil
+}
 
-local ret = redis.call("EXISTS", chatId)
-if not ret then
-	redis.call("SETEX", chatId, %d, seq+1)
-else
-	seq = redis.call("GETEX", chatId, "EX", %d)
-	redis.call("INCR", chatId)
-end
-
-return seq
-`
-
-	luaScriptAtomicLockChatIdTxt = `
-local lockName = KEYS[1]
-local lockId = ARGV[1]
-
-local ret = redis.call("EXISTS", lockName)
-if ret == 1 then
-	return 1
-end
-
-redis.call("SETEX", lockName, %d, lockId)
-return 0
-`
-
-	luaScriptAtomicUnlockChatIdTxt = `
-local lockName = KEYS[1]
-local lockId = ARGV[1]
-
-local ret = redis.call("EXISTS", lockName)
-if ret == 0 then
-	return 2
-end
-
-ret = redis.call("GET", lockName)
-if ret == lockId then
-	redis.call("DEL", lockName)
-	return 0
-end
-
-return 1
-`
-
-	luaScriptAtomicReLockChatIdTxt = `
-local lockName = KEYS[1]
-local lockId = ARGV[1]
-
-local ret = redis.call("EXISTS", lockName)
-if ret == 0 then
-	return 2
-end
-
-ret = redis.call("GET", lockName)
-if ret == lockId then
-	redis.call("SETEX", lockName, %d, lockId)
-	return 0
-end
-
-return 1
-`
+var (
+	luaScriptAtomicSetGroupCache = redis.NewScript(luaScriptAtomicSetGroupCacheTxt)
 )
+
+func SetGroupInfoCache(info *entities.GroupInfo) (string, error) {
+	updateTime := info.UpdatedAt.UnixMilli()
+	data, err := json.Marshal(info)
+	if err != nil {
+		return "", err
+	}
+	md5Buf := md5.Sum(data)
+	md5Ret := string(md5Buf[:])
+
+	err = luaScriptAtomicSetGroupCache.Run(
+		context.Background(),
+		redisConnection,
+		[]string{md5Ret, strconv.FormatInt(updateTime, 10), strconv.FormatInt(info.Id, 10)},
+		data).Err()
+	if err != nil {
+		return "", err
+	}
+	return md5Ret, nil
+}
+
+func CheckAndCmpGroupInfoCache(groupId int64, md5Val string) (bool, error) {
+	ret := redisConnection.HGet(context.Background(), "groupInfoHash", strconv.FormatInt(groupId, 10))
+	if ret.Err() != nil {
+		return false, returnNilForRedisNil(ret.Err())
+	}
+
+	return md5Val == ret.String(), nil
+}
+
+func PullGroupInfoCache(groupId int64) (*entities.GroupInfo, error) {
+	ret := redisConnection.HGet(context.Background(), "groupInfo", strconv.FormatInt(groupId, 10))
+	if ret.Err() != nil {
+		return nil, returnNilForRedisNil(ret.Err())
+	}
+
+	info := &entities.GroupInfo{}
+	err := json.Unmarshal([]byte(ret.String()), info)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
+var (
+	luaScriptAtomicSetFriendshipCache = redis.NewScript(luaScriptAtomicSetFriendshipCacheTxt)
+)
+
+func SetFriendshipCache(userKey string, updateTime int64, isFriend bool) error {
+	return luaScriptAtomicSetFriendshipCache.Run(context.Background(),
+		redisConnection,
+		[]string{userKey, strconv.FormatInt(updateTime, 10)},
+		isFriend).Err()
+}
+
+func PullFriendshipCache(userKey string) (bool, error) {
+	ret := redisConnection.HGet(context.Background(), "friendship", userKey)
+	if ret.Err() != nil {
+		return false, ret.Err()
+	}
+
+	return ret.Bool()
+}
 
 const (
 	LockSuccess = iota
@@ -158,12 +175,9 @@ const (
 )
 
 var (
-	luaScriptAtomicSetAndIncrChatSeq = redis.NewScript(fmt.Sprintf(luaScriptAtomicSetAndIncrChatSeqTxt,
-		ChatIdTimeOut/time.Second, ChatIdTimeOut/time.Second))
-
-	luaScriptAtomicLockChatId   = redis.NewScript(fmt.Sprintf(luaScriptAtomicLockChatIdTxt, ChatIdLockTimeOut/time.Second+defaultDeleteDelay))
+	luaScriptAtomicLockChatId   = redis.NewScript(luaScriptAtomicLockChatIdTxt)
 	luaScriptAtomicUnlockChatId = redis.NewScript(luaScriptAtomicUnlockChatIdTxt)
-	luaScriptAtomicReLockChatId = redis.NewScript(fmt.Sprintf(luaScriptAtomicReLockChatIdTxt, ChatIdLockTimeOut/time.Second+defaultDeleteDelay))
+	luaScriptAtomicReLockChatId = redis.NewScript(luaScriptAtomicReLockChatIdTxt)
 )
 
 const defaultDeleteDelay = 3
@@ -177,11 +191,11 @@ type RedisLock struct {
 	unlockChannel chan struct{}
 }
 
-func NewRedisLock(lockId, machineId int64) *RedisLock {
+func NewRedisLock(lockName string, machineId int64) *RedisLock {
 	return &RedisLock{
 		lockId: strconv.FormatInt(machineId, 10) + "_" +
 			strconv.FormatInt(tools.GenerateSnowflakeId(false), 10),
-		lockName:      strconv.FormatInt(lockId, 10) + "_lock",
+		lockName:      lockName + "_lock",
 		isLocked:      atomic.NewBool(false),
 		retryError:    atomic.NewError(nil),
 		internalTimer: nil,
@@ -195,16 +209,16 @@ func (lock *RedisLock) Lock() (bool, error) {
 	}
 
 	// lua 脚本的执行原子性保证了获取锁的原子性
-	if ok, err := checkLockReturnValue(luaScriptAtomicLockChatId.Run(context.Background(), redisConnection, []string{lock.lockName}, lock.lockId)); !ok {
+	if ok, err := checkLockReturnValue(luaScriptAtomicLockChatId.Run(context.Background(), redisConnection, []string{lock.lockName}, lock.lockId, redisLockTimeOut/time.Second+defaultDeleteDelay)); !ok {
 		return false, err
 	}
 
-	lock.internalTimer = time.NewTicker(ChatIdLockTimeOut)
+	lock.internalTimer = time.NewTicker(redisLockTimeOut)
 	go func() {
 		for {
 			select {
 			case <-lock.internalTimer.C:
-				if ok, err := checkLockReturnValue(luaScriptAtomicReLockChatId.Run(context.Background(), redisConnection, []string{lock.lockName}, lock.lockId)); !ok {
+				if ok, err := checkLockReturnValue(luaScriptAtomicReLockChatId.Run(context.Background(), redisConnection, []string{lock.lockName}, lock.lockId, redisLockTimeOut/time.Second+defaultDeleteDelay)); !ok {
 					lock.retryError.Store(err)
 					lock.isLocked.Store(false)
 					return
@@ -249,3 +263,126 @@ func checkLockReturnValue(result *redis.Cmd) (bool, error) {
 
 	return true, nil
 }
+
+func getCacheMessageKey(chatId int64, seq uint64) string {
+	return strconv.FormatInt(chatId, 10) + "_" + strconv.FormatUint(seq, 10)
+}
+
+func returnNilForRedisNil(err error) error {
+	if err == redis.Nil {
+		return RedisNoResultError
+	}
+	return err
+}
+
+var (
+	luaScriptAtomicLockChatIdTxt = `
+local lockName = KEYS[1]
+local lockId = ARGV[1]
+local timeout = ARGV[2]
+
+local ret = redis.call("EXISTS", lockName)
+if ret == 1 then
+    return 1
+end
+
+redis.call("SETEX", lockName, timeout, lockId)
+return 0`
+
+	luaScriptAtomicUnlockChatIdTxt = `
+local lockName = KEYS[1]
+local lockId = ARGV[1]
+
+local ret = redis.call("EXISTS", lockName)
+if ret == 0 then
+    return 2
+end
+
+ret = redis.call("GET", lockName)
+if ret == lockId then
+    redis.call("DEL", lockName)
+    return 0
+end
+
+return 1`
+
+	luaScriptAtomicReLockChatIdTxt = `
+local lockName = KEYS[1]
+local lockId = ARGV[1]
+local timeout = ARGV[2]
+
+local ret = redis.call("EXISTS", lockName)
+if ret == 0 then
+    return 2
+end
+
+ret = redis.call("GET", lockName)
+if ret == lockId then
+    redis.call("SETEX", lockName, timeout, lockId)
+    return 0
+end
+
+return 1`
+
+	luaScriptAtomicCheckAndSetExpiringTxt = `
+local token = KEYS[1]
+local userIdInt = ARGV[1]
+local userId = tostring(ARGV[1])
+local timeOut = ARGV[2]
+
+local ret = redis.call("EXISTS", userId)
+if ret then
+token = redis.call("GETEX", userId, "EX", timeOut)
+redis.call("SETEX", token, timeOut, userIdInt)
+return token
+end
+
+redis.call("SETEX", token, timeOut, userIdInt)
+redis.call("SETEX", userId, timeOut, token)
+return token`
+
+	luaScriptAtomicCheckAndResetTxt = `
+local token = KEYS[1]
+local timeOut = ARGV[2]
+
+local ret = redis.call("EXISTS", token)
+if not ret then
+return -1
+end
+
+local userIdInt = redis.call("GETEX", token, "EX", timeOut)
+redis.call("SETEX", tostring(userIdInt), timeOut, token)
+
+return userIdInt`
+
+	luaScriptAtomicSetGroupCacheTxt = `
+local md5 = KEYS[1]
+local updateTime = KEYS[2]
+local groupId = KEYS[3]
+local memberIdJson = ARGV[1]
+
+local updateTimeTableName = "groupInfoUpdateTime"
+local groupInfoTableName = "groupInfo"
+local hashTableName = "groupInfoHash"
+
+local ret = redis.call("HGET", updateTimeTableName, groupId)
+if (not ret) or (ret < updateTime) then
+    redis.call("HSET", updateTimeTableName, groupId, updateTime)
+    redis.call("HSET", hashTableName, groupId, md5)
+    redis.call("HSET", groupInfoTableName, groupId, memberIdJson)
+end`
+
+	luaScriptAtomicSetFriendshipCacheTxt = `
+local userKey = KEYS[1]
+local updateTime = KEYS[2]
+local isFriend = ARGV[1]
+
+local updateTimeTableName = "friendshipUpdateTime"
+local friendshipTableName = "friendship"
+
+local ret = redis.call("HGET", updateTimeTableName, userKey)
+if (not ret) or (ret < updateTime) then
+    redis.call("HSET", updateTimeTableName, userKey, updateTime)
+    redis.call("HSET", friendshipTableName, userKey, isFriend)
+end`
+)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"liveChat/entities"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -18,7 +19,7 @@ func TestInitRedisConnection(t *testing.T) {
 
 func TestRedisLockAndUnLock(t *testing.T) {
 	redisConnection.FlushAll(context.Background())
-	lock := NewRedisLock(12345, 10)
+	lock := NewRedisLock(strconv.FormatInt(12345, 10), 10)
 
 	if ok, _ := lock.Unlock(); ok {
 		t.Fatalf("Redis lock initially locked")
@@ -36,7 +37,7 @@ func TestRedisLockAndUnLock(t *testing.T) {
 		t.Fatalf("Redis lock re-entry unexpectedly succeeded")
 	}
 
-	time.Sleep(ChatIdLockTimeOut + 4*time.Second)
+	time.Sleep(redisLockTimeOut + 4*time.Second)
 
 	if ok, err := lock.Unlock(); err != nil {
 		t.Fatalf("Redis lock unlock failed: %s", err.Error())
@@ -46,8 +47,8 @@ func TestRedisLockAndUnLock(t *testing.T) {
 }
 
 func TestRedisLockMulti(t *testing.T) {
-	lock1 := NewRedisLock(12345, 10)
-	lock2 := NewRedisLock(12345, 11)
+	lock1 := NewRedisLock(strconv.FormatInt(12345, 10), 10)
+	lock2 := NewRedisLock(strconv.FormatInt(12345, 10), 11)
 
 	if _, err := lock1.Lock(); err != nil {
 		t.Fatalf("Redis Lock1 lock failed: %s", err.Error())

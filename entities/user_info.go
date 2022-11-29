@@ -1,7 +1,6 @@
 package entities
 
 import (
-	"database/sql"
 	"errors"
 )
 
@@ -16,13 +15,13 @@ var (
 )
 
 type UserInfo struct {
-	Id               int64 `gorm:"primaryKey"`
-	Username         string
-	UserAvatar       string
-	UserIntroduction string
+	Id               int64  `gorm:"primaryKey" json:"id"`
+	Username         string `json:"username"`
+	UserAvatar       string `json:"avatar"`
+	UserIntroduction string `json:"introduction"`
 
-	Friendships []Friendship  `gorm:"foreignKey:SelfId"`
-	Groups      []GroupMember `gorm:"foreignKey:MemberId"`
+	Friendships []Friendship  `gorm:"foreignKey:SelfId" json:"friendships"`
+	Groups      []GroupMember `gorm:"foreignKey:MemberId" json:"groupList"`
 }
 
 func NewUserInfo(id int64, userName string) *UserInfo {
@@ -49,28 +48,4 @@ func NewEmptyUserInfo() *UserInfo {
 		Friendships: make([]Friendship, 0, 0),
 		Groups:      make([]GroupMember, 0, 0),
 	}
-}
-
-func ScanUserInfoFromSqlResult(rows *sql.Rows) (*UserInfo, error) {
-	if !rows.Next() {
-		return nil, ScanUserInfoNoResult
-	}
-
-	var (
-		userId           = int64(0)
-		userName         = ""
-		userAvatar       = ""
-		userIntroduction = ""
-	)
-
-	if err := rows.Scan(&userId, &userName, &userAvatar, &userIntroduction); err != nil {
-		return nil, err
-	}
-
-	return &UserInfo{
-		Id:               userId,
-		Username:         userName,
-		UserAvatar:       userAvatar,
-		UserIntroduction: userIntroduction,
-	}, nil
 }

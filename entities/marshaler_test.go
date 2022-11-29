@@ -2,11 +2,11 @@ package entities
 
 import (
 	"github.com/golang/protobuf/proto"
-	"liveChat/protocol"
+	"liveChat/rpc"
 	"testing"
 )
 
-var protobufMessage = protocol.Message{
+var protobufMessage = rpc.Message{
 	Id:        1,
 	Sender:    1,
 	Receiver:  1,
@@ -25,7 +25,7 @@ func BenchmarkSerializeMessageWithProtobuf(b *testing.B) {
 }
 
 func BenchmarkDeserializeMessageWithProtobuf(b *testing.B) {
-	proto.Unmarshal(protobufBinary, &protocol.Message{})
+	proto.Unmarshal(protobufBinary, &rpc.Message{})
 }
 
 func BenchmarkSerializeMessageWithJson(b *testing.B) {

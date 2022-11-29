@@ -6,7 +6,7 @@ var slicePool sync.Pool
 
 func init() {
 	slicePool = sync.Pool{New: func() interface{} {
-		return make([]byte, 8, 8)
+		return make([]byte, 12, 12)
 	}}
 }
 

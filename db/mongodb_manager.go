@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -12,8 +13,9 @@ import (
 	"liveChat/config"
 	"liveChat/constants"
 	"liveChat/entities"
-	"liveChat/protocol"
+	"liveChat/rpc"
 	"liveChat/tools"
+	"time"
 )
 
 const defaultMongoDBConfigPath = "./mongodb_config.json"
@@ -23,14 +25,23 @@ var MongoDBConfigPath = defaultMongoDBConfigPath
 var (
 	mongoDbCfg *config.MongoDBConfig
 
-	mongoConnection *mongo.Client = nil
+	mongoConnection *mongo.Client
 
 	// 存放所有消息的集合对象
-	messageCollection *mongo.Collection = nil
+	messageCollection *mongo.Collection
 	// 存放所有会话最新消息序号的集合对象
-	queueCollection *mongo.Collection = nil
+	queueCollection *mongo.Collection
+	// 存放所有需要处理的通知的集合对象
+	notificationCollection *mongo.Collection
+	// 存放某个对象最新通知序号的集合对象
+	notiSeqCollection *mongo.Collection
 
 	isMongodbInitiated bool = false
+)
+
+const (
+	mongoQueueCollectionName   = "queue"
+	mongoMessageCollectionName = "message"
 )
 
 const (
@@ -56,6 +67,12 @@ const (
 
 	MessageId       = "id"
 	MessageReceiver = "receiver"
+
+	NotificationId           = "receiver_id"
+	NotificationSequence     = "sequence"
+	NotificationHandleUserId = "handle_user_id"
+	NotificationIsHandled    = "is_handled"
+	NotificationIsAgree      = "is_agree"
 )
 
 const (
@@ -65,7 +82,11 @@ const (
 
 const chatTypeMask = 1 << 63
 
-func InitMongoDBConnection(configPath string, needToInitDb bool) error {
+var (
+	MongoErrorNoNotification = errors.New("无匹配通知")
+)
+
+func InitMongoDBConnection(configPath string) error {
 	if isMongodbInitiated {
 		return nil
 	}
@@ -85,10 +106,8 @@ func InitMongoDBConnection(configPath string, needToInitDb bool) error {
 		return err
 	}
 
-	if needToInitDb {
-		if err = createCollectionsAndIndexes(mongoDbCfg); err != nil {
-			return err
-		}
+	if err = createCollectionsAndIndexes(mongoDbCfg); err != nil {
+		return err
 	}
 
 	initConnection(mongoDbCfg)
@@ -96,9 +115,9 @@ func InitMongoDBConnection(configPath string, needToInitDb bool) error {
 	return nil
 }
 
-func GetChatSeqInSlice(chatId []int64) ([]entities.Chat, error) {
+func GetChatSeqInSlice(ctx context.Context, chatId []int64) ([]entities.Chat, error) {
 	filter := bson.D{{ChatId, bson.D{{mongoDbIn, chatId}}}}
-	cursor, err := queueCollection.Find(context.Background(), filter, nil)
+	cursor, err := queueCollection.Find(ctx, filter, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -110,41 +129,37 @@ func GetChatSeqInSlice(chatId []int64) ([]entities.Chat, error) {
 	return seqSlice, nil
 }
 
-func GetChatSequence(chatId int64) (uint64, error) {
+func GetChatSequence(ctx context.Context, chatId int64) (uint64, error) {
 	chat := entities.NewEmptyChat()
-	if err := findDocumentOne(context.Background(), getBson(ChatId, chatId), queueCollection, chat); err != nil {
+	if err := findDocumentOne(ctx, getBson(ChatId, chatId), queueCollection, chat); err != nil {
 		return constants.MaxUInt64, err
 	}
 
 	return chat.Sequence, nil
 }
 
-func GetAndAddChatSequence(chatId int64) (uint64, error) {
+func GetAndAddChatSequence(ctx context.Context, chatId int64) (uint64, error) {
 	chat := entities.NewEmptyChat()
 	result := queueCollection.FindOneAndUpdate(
-		context.Background(),
+		ctx,
 		getBson(ChatId, chatId),
 		bson.D{{mongoDbIncr, bson.D{{ChatSequence, 1}}}, {mongoDbSetInInsert, bson.D{{ChatId, chatId}}}},
 		options.FindOneAndUpdate().SetUpsert(true),
 	)
 
-	if result.Err() == nil {
-		if err := result.Decode(&chat); err == nil {
-			return chat.Sequence, nil
-		} else {
-			return constants.MaxUInt64, err
-		}
-	}
-
-	if result.Err() != mongo.ErrNoDocuments {
+	if result.Err() != nil {
 		return constants.MaxUInt64, result.Err()
 	}
 
-	return 0, nil
+	if err := result.Decode(&chat); err != nil {
+		return constants.MaxUInt64, err
+	}
+
+	return chat.Sequence, nil
 }
 
-func GetMessageInSeqRange(chatId int64, bottom, top uint64) ([]entities.Message, error) {
-	cursor, err := messageCollection.Find(context.Background(),
+func GetMessageInSeqRange(ctx context.Context, chatId int64, bottom, top uint64) ([]entities.Message, error) {
+	cursor, err := messageCollection.Find(ctx,
 		bson.D{{MessageReceiver, chatId}, {MessageId, bson.D{{mongoDbGreaterEqual, bottom}, {mongoDbLessEqual, top}}}},
 		nil,
 	)
@@ -160,16 +175,16 @@ func GetMessageInSeqRange(chatId int64, bottom, top uint64) ([]entities.Message,
 	return messageSlice, nil
 }
 
-func GetMessageInSeq(chatId int64, seq uint64) (*entities.Message, error) {
+func GetMessageInSeq(ctx context.Context, chatId int64, seq uint64) (*entities.Message, error) {
 	message := entities.NewEmptyMessage()
-	if err := findDocumentOne(context.Background(), bson.D{{MessageReceiver, chatId}, {MessageId, seq}}, messageCollection, message); err != nil {
+	if err := findDocumentOne(ctx, bson.D{{MessageReceiver, chatId}, {MessageId, seq}}, messageCollection, message); err != nil {
 		return nil, err
 	}
 	return message, nil
 }
 
-func CreateMessageWithSeq(m *protocol.Message) (*entities.Message, error) {
-	seq, err := GetAndAddChatSequence(m.Receiver)
+func CreateMessageWithSeq(ctx context.Context, m *rpc.Message) (*entities.Message, error) {
+	seq, err := GetAndAddChatSequence(ctx, m.Receiver)
 	if err != nil {
 		return nil, err
 	}
@@ -179,16 +194,105 @@ func CreateMessageWithSeq(m *protocol.Message) (*entities.Message, error) {
 	return message, nil
 }
 
-func AddMessage(m *protocol.Message) error {
-	message, err := CreateMessageWithSeq(m)
+func AddMessage(ctx context.Context, m *rpc.Message) error {
+	message, err := CreateMessageWithSeq(ctx, m)
 	if err != nil {
 		return err
 	}
-	if err = insertDocumentOne(context.Background(), message, messageCollection); err != nil {
+	if err = insertDocumentOne(ctx, message, messageCollection); err != nil {
 		return err
 	}
-	// 转移到其他业务文件中处理 CacheMessageWithTimeOut(message)
 	return nil
+}
+
+func GetNotificationSequence(ctx context.Context, receiverId int64) (uint64, error) {
+	noti := &entities.Notification{}
+	if err := findDocumentOne(ctx, getBson(NotificationId, receiverId), notiSeqCollection, noti); err != nil {
+		return constants.MaxUInt64, err
+	}
+
+	return noti.Seq, nil
+}
+
+func GetNotificationInSeqRange(ctx context.Context, receiverId int64, bottom, top uint64) ([]entities.Notification, error) {
+	cursor, err := notificationCollection.Find(ctx,
+		bson.D{{NotificationId, receiverId}, {NotificationSequence, bson.D{{mongoDbGreaterEqual, bottom}, {mongoDbLessEqual, top}}}},
+		nil,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	notiSlice := make([]entities.Notification, 0)
+	if err = decodeDataInCursor(cursor, &notiSlice); err != nil {
+		return nil, err
+	}
+	return notiSlice, nil
+}
+
+func GetNotificationInSeq(ctx context.Context, receiverId int64, seq uint64) (*entities.Notification, error) {
+	noti := &entities.Notification{}
+	if err := findDocumentOne(ctx, bson.D{{NotificationId, receiverId}, {NotificationSequence, seq}}, notificationCollection, noti); err != nil {
+		return nil, err
+	}
+	return noti, nil
+}
+
+func HandleNotification(ctx context.Context, receiverId, handleUserId int64, seq uint64, isAgree bool) (*entities.Notification, error) {
+	result := notificationCollection.FindOneAndUpdate(
+		ctx,
+		bson.D{{mongoDbAnd, bson.A{bson.D{{NotificationId, receiverId}}, bson.D{{NotificationSequence, seq}}}}},
+		bson.D{{NotificationIsHandled, true}, {NotificationIsAgree, isAgree}, {NotificationHandleUserId, handleUserId}},
+		nil,
+	)
+
+	noti := &entities.Notification{}
+	if err := result.Decode(noti); err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, MongoErrorNoNotification
+		}
+		return nil, err
+	}
+
+	noti.HandleUserId = handleUserId
+	noti.IsHandled = true
+	noti.IsAgree = isAgree
+	return noti, nil
+}
+
+func getAndAddNotificationSequence(ctx context.Context, receiverId int64) (uint64, error) {
+	noti := entities.Notification{}
+	result := notiSeqCollection.FindOneAndUpdate(
+		ctx,
+		getBson(NotificationId, receiverId),
+		bson.D{{mongoDbIncr, bson.D{{NotificationSequence, 1}}}, {mongoDbSetInInsert, bson.D{{NotificationId, receiverId}}}},
+		options.FindOneAndUpdate().SetUpsert(true),
+	)
+
+	if result.Err() != nil {
+		return constants.MaxUInt64, result.Err()
+	}
+
+	if err := result.Decode(&noti); err != nil {
+		return constants.MaxUInt64, err
+	}
+
+	return noti.Seq, nil
+}
+
+func AddAndReturnNotification(ctx context.Context, n *entities.Notification) (*entities.Notification, error) {
+	sequence, err := getAndAddNotificationSequence(ctx, n.ReceiverId)
+	if err != nil {
+		return nil, err
+	}
+	n.Seq = sequence
+	n.Timestamp = time.Now().Unix()
+
+	if err = insertDocumentOne(ctx, n, notificationCollection); err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 func SubscribeChatSeq(chatId int64) (*mongo.ChangeStream, error) {
@@ -266,20 +370,37 @@ func getDefaultMongoConcern() *options.ClientOptions {
 
 func initConnection(cfg *config.MongoDBConfig) {
 	db := mongoConnection.Database(cfg.Database)
-	messageCollection = db.Collection(cfg.MessageCollection)
-	queueCollection = db.Collection(cfg.QueueCollection)
+	messageCollection = db.Collection(mongoMessageCollectionName)
+	queueCollection = db.Collection(mongoQueueCollectionName)
 
 }
 
 func createCollectionsAndIndexes(cfg *config.MongoDBConfig) error {
 	db := mongoConnection.Database(cfg.Database)
-
-	if err := createCollectionAndIndexOne(db, cfg.MessageCollection, MessageReceiver, MessageId); err != nil {
+	lists, err := db.ListCollectionNames(context.Background(), bson.D{}, nil)
+	if err != nil {
 		return err
 	}
 
-	if err := createCollectionAndIndexOne(db, cfg.QueueCollection, ChatId); err != nil {
-		return err
+	flag1, flag2 := false, false
+	for _, name := range lists {
+		if name == mongoMessageCollectionName {
+			flag1 = true
+		} else if name == mongoQueueCollectionName {
+			flag2 = true
+		}
+	}
+
+	if !flag1 {
+		if err = createCollectionAndIndexOne(db, mongoMessageCollectionName, MessageReceiver, MessageId); err != nil {
+			return err
+		}
+	}
+
+	if !flag2 {
+		if err = createCollectionAndIndexOne(db, mongoQueueCollectionName, ChatId); err != nil {
+			return err
+		}
 	}
 
 	return nil

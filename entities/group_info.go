@@ -1,15 +1,20 @@
 package entities
 
+import "time"
+
 type GroupInfo struct {
-	Id    int64 `gorm:"primaryKey"`
-	Owner int64
+	Id    int64 `gorm:"primaryKey" json:"id"`
+	Owner int64 `json:"ownerId"`
 
-	Name         string
-	Introduction string
-	Avatar       string
-	IsDeleted    bool
+	Name         string `json:"name"`
+	Introduction string `json:"introduction"`
+	Avatar       string `json:"avatar"`
+	IsDeleted    bool   `json:"-"`
 
-	Members []GroupMember `gorm:"foreignKey:GroupId"`
+	CreatedAt time.Time `json:"-"`
+	UpdatedAt time.Time `json:"-"`
+
+	Members []GroupMember `gorm:"foreignKey:GroupId" json:"members"`
 }
 
 func NewGroupInfo(id, owner int64, name, introduction, avatar string) *GroupInfo {

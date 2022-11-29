@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package="./protocol";
+option go_package="./rpc";
 
 message ErrorResponse {
   string reason = 1;
@@ -38,6 +38,12 @@ message RequestMultiMessage {
 
 message RequestEstablishConnection {
   string token = 1;
+
+  enum platformType {
+    Web = 0;
+    Android = 1;
+  }
+  platformType platform = 2;
 }
 
 message ResponseEstablishConnection {

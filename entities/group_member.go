@@ -5,11 +5,11 @@ import (
 )
 
 type GroupMember struct {
-	gorm.Model
-	GroupId         int64 `gorm:"uniqueIndex:group_info_index"`
-	MemberId        int64 `gorm:"uniqueIndex:group_info_index;index:reverse_select_index"`
-	IsAdministrator bool
-	IsDeleted       bool `gorm:"uniqueIndex:group_info_index;index:reverse_select_index"`
+	GormModel       gorm.Model `gorm:"embedded" json:"-"`
+	GroupId         int64      `gorm:"uniqueIndex:group_info_index" json:"groupId"`
+	MemberId        int64      `gorm:"uniqueIndex:group_info_index;index:reverse_select_index" json:"memberId"`
+	IsAdministrator bool       `json:"isAdministrator"`
+	IsDeleted       bool       `gorm:"uniqueIndex:group_info_index;index:reverse_select_index" json:"-"`
 }
 
 func NewGroupMember(groupId, userId int64, isAdministrator bool) *GroupMember {

@@ -10,6 +10,7 @@ import (
 	"liveChat/config"
 	"liveChat/entities"
 	"liveChat/tools"
+	"time"
 )
 
 const defaultMysqlConfigPath = "./mysql_config.json"
@@ -63,8 +64,9 @@ func InitMysqlConnection(configPath string) error {
 	return nil
 }
 
-func Login(account, password string) (id int64, err error) {
-	result := mysqlDb.Model(&loginTableEntry{}).Select("id").Where("account = ? AND password = ?", account, password).Find(&id)
+func Login(executor *gorm.DB, account, password string) (id int64, err error) {
+	executor = returnMysqlDbObj(executor)
+	result := executor.Model(&loginTableEntry{}).Select("id").Where("account = ? AND password = ?", account, password).Find(&id)
 	if result.Error != nil {
 		return -1, result.Error
 	} else if result.RowsAffected == 0 {
@@ -74,11 +76,9 @@ func Login(account, password string) (id int64, err error) {
 	return id, nil
 }
 
-func Register(account, email, password string) (id int64, err error) {
-	err = mysqlDb.Transaction(func(tx *gorm.DB) (err error) {
-		if !validateRegisterInfo(account, email, password) {
-			return MysqlValidateFailed
-		}
+func Register(executor *gorm.DB, account, email, password string) (id int64, err error) {
+	executor = returnMysqlDbObj(executor)
+	err = executor.Transaction(func(tx *gorm.DB) (err error) {
 
 		id = tools.GenerateSnowflakeId(false)
 		entry := loginTableEntry{
@@ -104,12 +104,23 @@ func Register(account, email, password string) (id int64, err error) {
 	return
 }
 
-func SearchUserInfo(id int64) (*entities.UserInfo, error) {
-	info := entities.NewEmptyUserInfo()
-	result := mysqlDb.Preload("Groups", "member_id = ? AND is_deleted = 0", id).
-		Preload("Friendships", "self_id = ? AND is_deleted = 0", id).
-		Where("id = ?", id).
-		Find(info)
+func SearchUserInfo(executor *gorm.DB, id int64, isSelf bool) (*entities.UserInfo, error) {
+	executor = returnMysqlDbObj(executor)
+	var (
+		info   = entities.NewEmptyUserInfo()
+		result *gorm.DB
+	)
+
+	if isSelf {
+		result = executor.Preload("Groups", "member_id = ? AND is_deleted = 0", id).
+			Preload("Friendships", "self_id = ? AND is_deleted = 0", id).
+			Where("id = ?", id).
+			Find(info)
+	} else {
+		result = executor.
+			Where("id = ?", id).
+			Find(info)
+	}
 
 	if result.Error != nil {
 		return nil, result.Error
@@ -120,20 +131,24 @@ func SearchUserInfo(id int64) (*entities.UserInfo, error) {
 	return info, nil
 }
 
-func UpdateUserName(userId int64, userName string) error {
-	return updateUserInfo(userId, "username", userName)
+func UpdateUserName(executor *gorm.DB, userId int64, userName string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateUserInfo(executor, userId, "username", userName)
 }
 
-func UpdateUserAvatar(userId int64, userAvatar string) error {
-	return updateUserInfo(userId, "user_avatar", userAvatar)
+func UpdateUserAvatar(executor *gorm.DB, userId int64, userAvatar string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateUserInfo(executor, userId, "user_avatar", userAvatar)
 }
 
-func UpdateUserIntroduction(userId int64, userIntroduction string) error {
-	return updateUserInfo(userId, "user_introduction", userIntroduction)
+func UpdateUserIntroduction(executor *gorm.DB, userId int64, userIntroduction string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateUserInfo(executor, userId, "user_introduction", userIntroduction)
 }
 
-func AgreeFriendShip(userId1, userId2 int64) (chatId int64, err error) {
-	err = mysqlDb.Transaction(func(tx *gorm.DB) error {
+func AgreeFriendShip(executor *gorm.DB, userId1, userId2 int64) (chatId int64, err error) {
+	executor = returnMysqlDbObj(executor)
+	err = executor.Transaction(func(tx *gorm.DB) error {
 		if err := isUserInfoExist(tx, userId1); err != nil {
 			return err
 		}
@@ -170,8 +185,9 @@ func AgreeFriendShip(userId1, userId2 int64) (chatId int64, err error) {
 	return
 }
 
-func DeleteFriendShip(userId1, userId2 int64) error {
-	return mysqlDb.Transaction(func(tx *gorm.DB) error {
+func DeleteFriendShip(executor *gorm.DB, userId1, userId2 int64) error {
+	executor = returnMysqlDbObj(executor)
+	return executor.Transaction(func(tx *gorm.DB) error {
 		if err := setDeleteFlagForFriendship(tx, userId1, userId2); err != nil {
 			return err
 		} else if err = setDeleteFlagForFriendship(tx, userId2, userId1); err != nil {
@@ -182,16 +198,33 @@ func DeleteFriendShip(userId1, userId2 int64) error {
 	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 }
 
-func SelectFriendShip(userId int64) ([]entities.Friendship, error) {
+func SelectFriendShip(executor *gorm.DB, userId int64) ([]entities.Friendship, error) {
+	executor = returnMysqlDbObj(executor)
 	friendships := make([]entities.Friendship, 0)
-	if result := mysqlDb.Where("self_id = ? AND is_deleted = 0", userId).Find(&friendships); result.Error != nil {
+	if result := executor.Where("self_id = ? AND is_deleted = 0", userId).Find(&friendships); result.Error != nil {
 		return nil, result.Error
 	}
 	return friendships, nil
 }
 
-func AddGroupInfo(owner int64, name, introduction, avatar string) (id int64, err error) {
-	err = mysqlDb.Transaction(func(tx *gorm.DB) error {
+func TellIsFriendBetween(executor *gorm.DB, userId1, userId2 int64) (bool, int64, error) {
+	executor = returnMysqlDbObj(executor)
+	friendship := &entities.Friendship{}
+	ret := executor.Where("self_id = ? AND friend_id = ?", userId1, userId2).Find(friendship)
+	if ret.Error != nil {
+		return false, 0, ret.Error
+	}
+
+	if ret.RowsAffected == 1 {
+		return friendship.IsDeleted, friendship.GormModel.UpdatedAt.UnixMilli(), nil
+	}
+
+	return false, time.Now().UnixMilli(), nil
+}
+
+func AddGroupInfo(executor *gorm.DB, owner int64, name, introduction, avatar string) (id int64, err error) {
+	executor = returnMysqlDbObj(executor)
+	err = executor.Transaction(func(tx *gorm.DB) error {
 		id = tools.GenerateSnowflakeId(true)
 		if err := tx.Create(entities.NewGroupInfo(id, owner, name, introduction, avatar)).Error; err != nil {
 			return err
@@ -210,9 +243,19 @@ func AddGroupInfo(owner int64, name, introduction, avatar string) (id int64, err
 	return
 }
 
-func SearchGroupInfo(id int64) (*entities.GroupInfo, error) {
-	groupInfo := entities.NewEmptyGroupInfo()
-	result := mysqlDb.Preload("Members", mysqlDb.Where(&entities.GroupMember{GroupId: id, IsDeleted: false})).Where("id = ?", id).Find(groupInfo)
+func SearchGroupInfo(executor *gorm.DB, id int64, isInGroup bool) (*entities.GroupInfo, error) {
+	executor = returnMysqlDbObj(executor)
+	var (
+		groupInfo = entities.NewEmptyGroupInfo()
+		result    *gorm.DB
+	)
+
+	if isInGroup {
+		result = executor.Preload("Members", executor.Where(&entities.GroupMember{GroupId: id, IsDeleted: false})).Where("id = ?", id).Find(groupInfo)
+	} else {
+		result = executor.Where("id = ?", id).Find(groupInfo)
+	}
+
 	if result.Error != nil {
 		return nil, result.Error
 	} else if result.RowsAffected != 1 {
@@ -222,8 +265,9 @@ func SearchGroupInfo(id int64) (*entities.GroupInfo, error) {
 	return groupInfo, nil
 }
 
-func DeleteGroupInfo(groupId int64) (err error) {
-	groupInfo, err := SearchGroupInfo(groupId)
+func DeleteGroupInfo(executor *gorm.DB, groupId int64) (err error) {
+	executor = returnMysqlDbObj(executor)
+	groupInfo, err := SearchGroupInfo(executor, groupId, true)
 	if err != nil {
 		return err
 	}
@@ -233,26 +277,29 @@ func DeleteGroupInfo(groupId int64) (err error) {
 		member.IsDeleted = true
 	}
 
-	return mysqlDb.
+	return executor.
 		Session(&gorm.Session{FullSaveAssociations: true, SkipDefaultTransaction: false}).
 		Save(groupInfo).
 		Error
 }
 
-func AgreeJoinGroup(userId, groupId int64) error {
-	clauseCond := mysqlDb.Clauses(clause.OnConflict{
+func AgreeJoinGroup(executor *gorm.DB, userId, groupId int64) error {
+	executor = returnMysqlDbObj(executor)
+	clauseCond := executor.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "group_id"}, {Name: "member_id"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{"is_deleted": false}),
 	})
 	return clauseCond.Create(entities.NewGroupMember(groupId, userId, false)).Error
 }
 
-func DeleteFromGroup(userId, groupId int64) error {
-	return setDeleteFlagForGroupMember(mysqlDb, groupId, userId)
+func DeleteFromGroup(executor *gorm.DB, userId, groupId int64) error {
+	executor = returnMysqlDbObj(executor)
+	return setDeleteFlagForGroupMember(executor, groupId, userId)
 }
 
-func AddAdministrator(userId, groupId int64) error {
-	result := mysqlDb.
+func AddAdministrator(executor *gorm.DB, userId, groupId int64) error {
+	executor = returnMysqlDbObj(executor)
+	result := executor.
 		Model(&entities.GroupMember{}).
 		Where("group_id = ? AND member_id = ? AND is_deleted = 0", groupId, userId).
 		Update("is_administrator", true)
@@ -266,8 +313,9 @@ func AddAdministrator(userId, groupId int64) error {
 	return nil
 }
 
-func DeleteAdministrator(userId, groupId int64) error {
-	result := mysqlDb.
+func DeleteAdministrator(executor *gorm.DB, userId, groupId int64) error {
+	executor = returnMysqlDbObj(executor)
+	result := executor.
 		Model(&entities.GroupMember{}).
 		Where("group_id = ? AND member_id = ? AND is_deleted = 0", groupId, userId).
 		Update("is_administrator", false)
@@ -281,20 +329,24 @@ func DeleteAdministrator(userId, groupId int64) error {
 	return nil
 }
 
-func UpdateGroupName(groupId int64, name string) error {
-	return updateGroupInfo(groupId, "name", name)
+func UpdateGroupName(executor *gorm.DB, groupId int64, name string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateGroupInfo(executor, groupId, "name", name)
 }
 
-func UpdateGroupIntroduction(groupId int64, introduction string) error {
-	return updateGroupInfo(groupId, "introduction", introduction)
+func UpdateGroupIntroduction(executor *gorm.DB, groupId int64, introduction string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateGroupInfo(executor, groupId, "introduction", introduction)
 }
 
-func UpdateGroupAvatar(groupId int64, avatar string) error {
-	return updateGroupInfo(groupId, "avatar", avatar)
+func UpdateGroupAvatar(executor *gorm.DB, groupId int64, avatar string) error {
+	executor = returnMysqlDbObj(executor)
+	return updateGroupInfo(executor, groupId, "avatar", avatar)
 }
 
-func SelectGroupMemberList(groupId int64) ([]entities.GroupMember, error) {
-	info, err := SearchGroupInfo(groupId)
+func SelectGroupMemberList(executor *gorm.DB, groupId int64) ([]entities.GroupMember, error) {
+	executor = returnMysqlDbObj(executor)
+	info, err := SearchGroupInfo(executor, groupId, true)
 	if err != nil {
 		return nil, err
 	}
@@ -302,22 +354,18 @@ func SelectGroupMemberList(groupId int64) ([]entities.GroupMember, error) {
 	return info.Members, nil
 }
 
-func SelectGroupInfoForUser(userId int64) ([]entities.GroupMember, error) {
+func SelectGroupInfoForUser(executor *gorm.DB, userId int64) ([]entities.GroupMember, error) {
+	executor = returnMysqlDbObj(executor)
 	ret := make([]entities.GroupMember, 0)
-	result := mysqlDb.Model(&entities.GroupMember{}).Where("member_id = ? AND is_deleted = 0", userId).Find(&ret)
+	result := executor.Model(&entities.GroupMember{}).Where("member_id = ? AND is_deleted = 0", userId).Find(&ret)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return ret, nil
 }
 
-// TODO 完善用户注册信息鉴别
-func validateRegisterInfo(account, email, password string) bool {
-	return true
-}
-
-func updateUserInfo(userId int64, columnName, columnValue string) error {
-	if result := mysqlDb.Model(&entities.UserInfo{}).Where("id = ?", userId).Update(columnName, columnValue); result.Error != nil {
+func updateUserInfo(executor *gorm.DB, userId int64, columnName, columnValue string) error {
+	if result := executor.Model(&entities.UserInfo{}).Where("id = ?", userId).Update(columnName, columnValue); result.Error != nil {
 		return result.Error
 	} else if result.RowsAffected != 1 {
 		return MysqlErrorUserNotExist
@@ -358,12 +406,19 @@ func setDeleteFlagForGroupMember(tx *gorm.DB, groupId, userId int64) error {
 	return nil
 }
 
-func updateGroupInfo(groupId int64, columnName, columnValue string) error {
-	if result := mysqlDb.Model(entities.NewEmptyGroupInfo()).Where("id = ?", groupId).Update(columnName, columnValue); result.Error != nil {
+func updateGroupInfo(executor *gorm.DB, groupId int64, columnName, columnValue string) error {
+	if result := executor.Model(entities.NewEmptyGroupInfo()).Where("id = ?", groupId).Update(columnName, columnValue); result.Error != nil {
 		return result.Error
 	} else if result.RowsAffected != 1 {
 		return MysqlErrorGroupNotExist
 	}
 
 	return nil
+}
+
+func returnMysqlDbObj(obj *gorm.DB) *gorm.DB {
+	if obj != nil {
+		return obj
+	}
+	return mysqlDb
 }

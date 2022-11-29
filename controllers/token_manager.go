@@ -1,20 +1,16 @@
 package controllers
 
-import "liveChat/containers"
+import (
+	"liveChat/db"
+	"strconv"
+	"time"
+)
 
-var tokenManager containers.ConcurrentMap
-
-func init() {
-	tokenManager = containers.New()
+func GetToken(userId int64) (token string, err error) {
+	token = strconv.FormatInt(userId, 10) + "_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	return db.RedisSetAndCheckTimeoutToken(token, userId)
 }
 
-func SetToken(token string, userId int64) {
-	tokenManager.Set(token, userId)
-}
-
-func GetUserIdByToken(token string) int64 {
-	if ret, ok := tokenManager.Get(token); ok {
-		return ret.(int64)
-	}
-	return -1
+func GetUserIdByToken(token string) (userId int64, err error) {
+	return db.RedisCheckAndResetToken(token)
 }

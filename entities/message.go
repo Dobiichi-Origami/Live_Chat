@@ -2,7 +2,7 @@ package entities
 
 import (
 	"go.mongodb.org/mongo-driver/bson"
-	"liveChat/protocol"
+	"liveChat/rpc"
 	"strings"
 )
 
@@ -37,7 +37,7 @@ func NewMessage(id uint64, sender, receiver int64, timestamp uint64, contentType
 	}
 }
 
-func NewMessageFromProtobufWithoutSeq(m *protocol.Message) *Message {
+func NewMessageFromProtobufWithoutSeq(m *rpc.Message) *Message {
 	return NewMessage(
 		0,
 		m.GetSender(),
@@ -48,7 +48,7 @@ func NewMessageFromProtobufWithoutSeq(m *protocol.Message) *Message {
 	)
 }
 
-func NewMessageFromProtobufWithSeq(m *protocol.Message) *Message {
+func NewMessageFromProtobufWithSeq(m *rpc.Message) *Message {
 	return NewMessage(
 		m.Id,
 		m.GetSender(),
@@ -74,13 +74,13 @@ func NewMessageFromChangeStreamBson(data bson.D) *Message {
 	}
 }
 
-func TransferMessageToProtoBuf(m *Message) *protocol.Message {
-	message := protocol.Message{
+func TransferMessageToProtoBuf(m *Message) *rpc.Message {
+	message := rpc.Message{
 		Id:        m.Id,
 		Sender:    m.Sender,
 		Receiver:  m.Receiver,
 		Timestamp: m.Timestamp,
-		Type:      protocol.MessageContentType(m.Type),
+		Type:      rpc.MessageContentType(m.Type),
 		Contents:  nil,
 	}
 

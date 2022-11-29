@@ -9,7 +9,7 @@ import (
 	"github.com/panjf2000/gnet/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"liveChat/protocol"
+	"liveChat/rpc"
 	"sync"
 	"time"
 )
@@ -129,7 +129,7 @@ func GenerateResponseBytes(responseType byte, ack, content []byte) []byte {
 }
 
 func GenerateErrorResponseBytes(errInfo string) []byte {
-	out, _ := proto.Marshal(&protocol.ErrorResponse{Reason: errInfo})
+	out, _ := proto.Marshal(&rpc.ErrorResponse{Reason: errInfo})
 	return out
 }
 

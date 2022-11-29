@@ -53,7 +53,7 @@ func BenchmarkMap_Set(b *testing.B) {
 
 func BenchmarkThreadSafeContainer_Get(b *testing.B) {
 	for i := 0; i < testElementScale; i++ {
-		if ret := tank.Get(idSlice[i]); ret != i {
+		if ret, _ := tank.Get(idSlice[i]); ret != i {
 			b.Fatalf("Thread safe container get wrong data in index %d. Data: %d", i, ret)
 		}
 	}
