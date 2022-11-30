@@ -31,9 +31,9 @@ var (
 
 var RedisNoResultError = errors.New("Redis 内不存在值")
 
-func InitRedisConnection(configPath string) error {
+func InitRedisConnection(configPath string) {
 	if isRedisInitiated {
-		return nil
+		return
 	}
 
 	path := tools.GetPath(RedisConfigPath, configPath)
@@ -42,17 +42,16 @@ func InitRedisConnection(configPath string) error {
 
 	options, err := redis.ParseURL(url)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	redisConnection = redis.NewClient(options)
 	err = redisConnection.Ping(context.Background()).Err()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	isRedisInitiated = true
-	return nil
 }
 
 func CacheMessageWithTimeOut(m *entities.Message) error {

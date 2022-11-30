@@ -179,6 +179,35 @@ func (cfg *MysqlConfig) Format() string {
 	return builder.String()
 }
 
+type GeneralConfig struct {
+	HttpListenAddresses []string `json:"http_listen_addresses"`
+	TcpListenAddress    string   `json:"tcp_listen_address"`
+
+	MessageQueueConfig      MessageQueueConfig `json:"message_queue_config"`
+	NotificationQueueConfig MessageQueueConfig `json:"notification_queue_config"`
+
+	EtcdUrls []string `json:"etcd_urls"`
+
+	GrpcServeAddress  string `json:"grpc_serve_address"`
+	GrpcListenAddress string `json:"grpc_listen_address"`
+
+	MysqlConfig   MysqlConfig   `json:"mysql_config"`
+	MongoDBConfig MongoDBConfig `json:"mongo_db_config"`
+	RedisConfig   RedisConfig   `json:"redis_config"`
+}
+
+type MessageQueueConfig struct {
+	Urls     []string
+	Topics   []string
+	GroupsId string
+}
+
+func NewGeneralConfig(path string) *GeneralConfig {
+	config := GeneralConfig{}
+	readConfigFile(path, &config)
+	return &config
+}
+
 // Tools
 func readConfigFile(path string, container interface{}) {
 	data, err := ioutil.ReadFile(path)

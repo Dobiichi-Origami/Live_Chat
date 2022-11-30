@@ -5,6 +5,7 @@ import (
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/v3"
 	"liveChat/log"
+	"liveChat/tools"
 	"strconv"
 	"time"
 )
@@ -61,6 +62,10 @@ func RegisterService(listenHost string) {
 					_, err = kv.Put(ctx, key, listenHost, clientv3.WithLease(curLeaseId))
 				}
 				cancelFunc()
+				index, _ := GetKeyIndex(key)
+				if index != -1 {
+					tools.InitSnowflake(int64(index))
+				}
 			} else if _, err := lease.KeepAliveOnce(context.TODO(), curLeaseId); err == rpctypes.ErrLeaseNotFound {
 				log.Error(err.Error())
 				curLeaseId = etcdDefaultNodeId
@@ -101,4 +106,21 @@ func GetAllKV(key string) (keys, values []string, err error) {
 		values = append(values, string(ikv.Value))
 	}
 	return
+}
+
+func GetKeyIndex(key string) (int, error) {
+	kv := clientv3.NewKV(client)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*etcdDefaultOutTime)
+	resps, err := kv.Get(ctx, key, clientv3.WithPrefix())
+	defer cancelFunc()
+	if err != nil {
+		return -1, err
+	}
+
+	for i, ikv := range resps.Kvs {
+		if string(ikv.Key) == key {
+			return i, nil
+		}
+	}
+	return -1, nil
 }

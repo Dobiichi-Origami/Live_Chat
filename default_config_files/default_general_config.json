@@ -1,0 +1,60 @@
+{
+  "http_listen_addresses": [
+    "0.0.0.0"
+  ],
+
+  "tcp_listen_address": "tcp://0.0.0.0:5678",
+
+  "message_queue_config": {
+    "Urls": "192.168.199.235:9092",
+    "Topics": "chat_message",
+    "GroupsId": "groupId1"
+  },
+
+  "notification_queue_config": {
+    "Urls": "192.168.199.235:9092",
+    "Topics": "chat_notification",
+    "GroupsId": "groupId2"
+  },
+
+  "etcd_urls": [
+    "192.168.199.235:2379"
+  ],
+
+  "grpc_serve_address": "a_address_outside.com",
+  "grpc_listen_address": "localhost",
+
+  "mysql_config": {
+    "address_list": [
+      {
+        "address": "192.168.199.235",
+        "port": "3306",
+        "username": "root",
+        "password": "password"
+      }
+    ],
+    "db": "default_database"
+  },
+
+  "mongo_db_config": {
+    "connection": {
+      "address_list": [
+        {
+          "address": "192.168.199.235",
+          "port": "27017"
+        }
+      ]
+    },
+    "database": "default_database"
+  },
+
+  "redis_config": {
+    "address_list": [
+      {
+        "address": "192.168.199.235",
+        "port": "6379"
+      }
+    ],
+    "db": "0"
+  }
+}

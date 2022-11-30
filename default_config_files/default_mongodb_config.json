@@ -7,9 +7,5 @@
       }
     ]
   },
-  "database": "default_database",
-  "message_collection": "message",
-  "queue_collection": "queue",
-  "user_info_collection": "user_info",
-  "group_info_collection": "group_info"
+  "database": "default_database"
 }

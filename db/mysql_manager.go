@@ -38,9 +38,9 @@ type loginTableEntry struct {
 	Email    string
 }
 
-func InitMysqlConnection(configPath string) error {
+func InitMysqlConnection(configPath string) {
 	if isMysqlInitiated {
-		return nil
+		return
 	}
 
 	var err = error(nil)
@@ -53,15 +53,15 @@ func InitMysqlConnection(configPath string) error {
 		SkipDefaultTransaction: true,
 		PrepareStmt:            true,
 	}); err != nil {
-		return err
+		panic(err)
 	}
 
 	if err = mysqlDb.AutoMigrate(&loginTableEntry{}, &entities.UserInfo{}, &entities.GroupInfo{}, &entities.Friendship{}, &entities.GroupMember{}); err != nil {
-		return err
+		panic(err)
 	}
 
 	isMysqlInitiated = true
-	return nil
+	return
 }
 
 func Login(executor *gorm.DB, account, password string) (id int64, err error) {

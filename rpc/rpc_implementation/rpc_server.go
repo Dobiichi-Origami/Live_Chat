@@ -3,12 +3,29 @@ package rpc_implementation
 import (
 	"context"
 	"github.com/golang/protobuf/proto"
+	"google.golang.org/grpc"
 	"liveChat/constants"
 	"liveChat/controllers"
 	"liveChat/log"
 	"liveChat/rpc"
 	"liveChat/tools"
+	"net"
 )
+
+var grpcServer *grpc.Server
+
+func InitRpcServer(listenAddress string) {
+	acp, err := net.Listen("tpc", listenAddress)
+	if err != nil {
+		panic(err)
+	}
+
+	grpcServer = grpc.NewServer()
+	rpc.RegisterServerNodeServer(grpcServer, &RpcServer{})
+	if err = grpcServer.Serve(acp); err != nil {
+		panic(err)
+	}
+}
 
 type RpcServer struct {
 	rpc.UnimplementedServerNodeServer

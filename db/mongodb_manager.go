@@ -86,9 +86,9 @@ var (
 	MongoErrorNoNotification = errors.New("无匹配通知")
 )
 
-func InitMongoDBConnection(configPath string) error {
+func InitMongoDBConnection(configPath string) {
 	if isMongodbInitiated {
-		return nil
+		return
 	}
 
 	path := tools.GetPath(MongoDBConfigPath, configPath)
@@ -98,21 +98,21 @@ func InitMongoDBConnection(configPath string) error {
 	var err error
 	mongoConnection, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(url), getDefaultMongoConcern())
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	err = mongoConnection.Ping(context.TODO(), nil)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	if err = createCollectionsAndIndexes(mongoDbCfg); err != nil {
-		return err
+		panic(err)
 	}
 
 	initConnection(mongoDbCfg)
 	isMongodbInitiated = true
-	return nil
+	return
 }
 
 func GetChatSeqInSlice(ctx context.Context, chatId []int64) ([]entities.Chat, error) {

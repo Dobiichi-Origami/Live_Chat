@@ -10,6 +10,8 @@ import (
 	"liveChat/tools"
 )
 
+var engine *engineImplementation
+
 type engineImplementation struct {
 	gnet.BuiltinEventEngine
 }
@@ -51,11 +53,11 @@ func (engine *engineImplementation) OnTraffic(c gnet.Conn) (action gnet.Action) 
 	return gnet.None
 }
 
-func InitiateTcpServer() error {
-	engine := new(engineImplementation)
-	if err := gnet.Run(engine, "tcp://0.0.0.0:1234", gnet.WithMulticore(true)); err != nil {
-		return err
+func InitiateTcpServer(address string) {
+	engine = &engineImplementation{}
+	if err := gnet.Run(engine, address, gnet.WithMulticore(true)); err != nil {
+		panic(err)
 	}
 
-	return nil
+	return
 }

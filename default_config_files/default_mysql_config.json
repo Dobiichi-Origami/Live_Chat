@@ -7,6 +7,5 @@
       "password": "password"
     }
   ],
-  "db": "default_database",
-  "user_info_table": "user_info"
+  "db": "default_database"
 }
