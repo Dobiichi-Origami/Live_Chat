@@ -1,7 +1,6 @@
 package pool
 
 import (
-	"liveChat/tcp"
 	"sync"
 )
 
@@ -9,7 +8,7 @@ var ctxPool sync.Pool
 
 func init() {
 	ctxPool = sync.Pool{New: func() interface{} {
-		return &tcp.TCPContext{}
+		return &TCPContext{}
 	}}
 }
 

@@ -23,7 +23,7 @@ type kafkaGroupConsumer struct {
 }
 
 func NewKafkaGroupConsumer(addresses, topics []string, groupIds string, asyncHandlerNumber int, fn ConsumeFunc) (MQConsumerGroup, error) {
-	cfg := &sarama.Config{}
+	cfg := sarama.NewConfig()
 	cfg.Version = sarama.V3_2_3_0
 	cfg.Consumer.Offsets.Initial = sarama.OffsetNewest
 	cfg.Consumer.Return.Errors = false
@@ -87,7 +87,7 @@ type KafkaAsyncProducer struct {
 }
 
 func NewKafkaAsyncProducer(addresses []string) (*KafkaAsyncProducer, error) {
-	cfg := sarama.Config{}
+	cfg := sarama.NewConfig()
 	cfg.Producer.Flush.Frequency = time.Second
 	cfg.Producer.RequiredAcks = sarama.WaitForLocal
 	cfg.Producer.Flush.Messages = 1000

@@ -27,7 +27,7 @@ func (engine *engineImplementation) OnOpen(c gnet.Conn) (out []byte, action gnet
 }
 
 func (engine *engineImplementation) OnClose(c gnet.Conn, err error) (action gnet.Action) {
-	ctx := c.Context().(TCPContext)
+	ctx := c.Context().(pool.TCPContext)
 	controllers.DeleteConnection(ctx.UserId, ctx.Platform)
 	pool.PutTCPContext(ctx)
 

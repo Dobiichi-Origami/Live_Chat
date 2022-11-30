@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/atomic"
-	"liveChat/config"
 	"liveChat/entities"
 	"liveChat/tools"
 	"strconv"
@@ -31,15 +30,10 @@ var (
 
 var RedisNoResultError = errors.New("Redis 内不存在值")
 
-func InitRedisConnection(configPath string) {
+func InitRedisConnection(url string) {
 	if isRedisInitiated {
 		return
 	}
-
-	path := tools.GetPath(RedisConfigPath, configPath)
-	cfg := config.NewRedisConfig(path)
-	url := cfg.Format()
-
 	options, err := redis.ParseURL(url)
 	if err != nil {
 		panic(err)

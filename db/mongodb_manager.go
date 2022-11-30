@@ -14,7 +14,6 @@ import (
 	"liveChat/constants"
 	"liveChat/entities"
 	"liveChat/rpc"
-	"liveChat/tools"
 	"time"
 )
 
@@ -23,7 +22,7 @@ const defaultMongoDBConfigPath = "./mongodb_config.json"
 var MongoDBConfigPath = defaultMongoDBConfigPath
 
 var (
-	mongoDbCfg *config.MongoDBConfig
+	mongoDbDatabaseName string
 
 	mongoConnection *mongo.Client
 
@@ -86,14 +85,12 @@ var (
 	MongoErrorNoNotification = errors.New("无匹配通知")
 )
 
-func InitMongoDBConnection(configPath string) {
+func InitMongoDBConnection(url, databaseName string) {
 	if isMongodbInitiated {
 		return
 	}
 
-	path := tools.GetPath(MongoDBConfigPath, configPath)
-	mongoDbCfg = config.NewMongoDBConfig(path)
-	url := mongoDbCfg.Format()
+	mongoDbDatabaseName = databaseName
 
 	var err error
 	mongoConnection, err = mongo.Connect(context.TODO(), options.Client().ApplyURI(url), getDefaultMongoConcern())
@@ -106,11 +103,11 @@ func InitMongoDBConnection(configPath string) {
 		panic(err)
 	}
 
-	if err = createCollectionsAndIndexes(mongoDbCfg); err != nil {
+	if err = createCollectionsAndIndexes(); err != nil {
 		panic(err)
 	}
 
-	initConnection(mongoDbCfg)
+	initConnection()
 	isMongodbInitiated = true
 	return
 }
@@ -368,15 +365,15 @@ func getDefaultMongoConcern() *options.ClientOptions {
 	return &opt
 }
 
-func initConnection(cfg *config.MongoDBConfig) {
-	db := mongoConnection.Database(cfg.Database)
+func initConnection() {
+	db := mongoConnection.Database(mongoDbDatabaseName)
 	messageCollection = db.Collection(mongoMessageCollectionName)
 	queueCollection = db.Collection(mongoQueueCollectionName)
 
 }
 
-func createCollectionsAndIndexes(cfg *config.MongoDBConfig) error {
-	db := mongoConnection.Database(cfg.Database)
+func createCollectionsAndIndexes() error {
+	db := mongoConnection.Database(mongoDbDatabaseName)
 	lists, err := db.ListCollectionNames(context.Background(), bson.D{}, nil)
 	if err != nil {
 		return err

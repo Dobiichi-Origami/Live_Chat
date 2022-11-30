@@ -1,4 +1,4 @@
-package tcp
+package pool
 
 const (
 	Web = iota

@@ -1,19 +1,27 @@
 {
   "http_listen_addresses": [
-    "0.0.0.0"
+    "0.0.0.0:1345"
   ],
 
   "tcp_listen_address": "tcp://0.0.0.0:5678",
 
   "message_queue_config": {
-    "Urls": "192.168.199.235:9092",
-    "Topics": "chat_message",
+    "Urls": [
+      "192.168.199.235:9092"
+    ],
+    "Topics": [
+      "chat_message"
+    ],
     "GroupsId": "groupId1"
   },
 
   "notification_queue_config": {
-    "Urls": "192.168.199.235:9092",
-    "Topics": "chat_notification",
+    "Urls": [
+      "192.168.199.235:9092"
+    ],
+    "Topics": [
+      "chat_notification"
+    ],
     "GroupsId": "groupId2"
   },
 
@@ -22,7 +30,7 @@
   ],
 
   "grpc_serve_address": "a_address_outside.com",
-  "grpc_listen_address": "localhost",
+  "grpc_listen_address": "localhost:1234",
 
   "mysql_config": {
     "address_list": [

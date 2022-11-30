@@ -38,16 +38,12 @@ type loginTableEntry struct {
 	Email    string
 }
 
-func InitMysqlConnection(configPath string) {
+func InitMysqlConnection(url string) {
 	if isMysqlInitiated {
 		return
 	}
 
 	var err = error(nil)
-
-	path := tools.GetPath(MysqlConfigPath, configPath)
-	mysqlCfg = config.NewMysqlConfig(path)
-	url := mysqlCfg.Format()
 
 	if mysqlDb, err = gorm.Open(gormSql.Open(url), &gorm.Config{
 		SkipDefaultTransaction: true,

@@ -30,7 +30,7 @@ func PushTask(arg interface{}) {
 func requestAsyncHandler(arg interface{}) {
 	var (
 		task          = arg.(pool.TCPRequestPackage)
-		ctx           = task.Conn.Context().(TCPContext)
+		ctx           = task.Conn.Context().(pool.TCPContext)
 		err           error
 		retSlice      []byte
 		retType       = constants.SuccessResponseLoad

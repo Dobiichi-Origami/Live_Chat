@@ -15,7 +15,7 @@ import (
 var grpcServer *grpc.Server
 
 func InitRpcServer(listenAddress string) {
-	acp, err := net.Listen("tpc", listenAddress)
+	acp, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		panic(err)
 	}
