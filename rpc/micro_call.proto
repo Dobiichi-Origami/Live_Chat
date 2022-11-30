@@ -30,6 +30,8 @@ message NotificationRequest {
   enum OpType {
     Add = 0;
     Delete = 1;
+    Approve = 2;
+    Refuse = 3;
   }
   OpType op = 6;
 

@@ -5,6 +5,8 @@ import "liveChat/rpc"
 const (
 	Add byte = iota
 	Delete
+	Approve
+	Refuse
 )
 
 const (

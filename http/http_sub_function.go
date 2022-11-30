@@ -189,7 +189,7 @@ func getUserIntroductionFromUrl(ctx *controllers.ProcessContext) (retBuf []byte,
 }
 
 func getFriendIdFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
-	friendId, retBuf, err := getParamFromURL(ctx, friendIdParam, "缺少目标用户 id", LackOfParameter)
+	friendId, retBuf, err := getInt64ParamFromURL(ctx, friendIdParam, "缺少目标用户 id", LackOfParameter)
 	if len(retBuf) == 0 && err == nil {
 		ctx.Param[friendIdKey] = friendId
 	}
@@ -197,9 +197,33 @@ func getFriendIdFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err err
 }
 
 func getGroupIdFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
-	groupId, retBuf, err := getParamFromURL(ctx, groupIdParam, "缺少目标群组 id", LackOfParameter)
+	groupId, retBuf, err := getInt64ParamFromURL(ctx, groupIdParam, "缺少目标群组 id", LackOfParameter)
 	if len(retBuf) == 0 && err == nil {
 		ctx.Param[groupIdKey] = groupId
+	}
+	return
+}
+
+func getGroupNameFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
+	groupName, retBuf, err := getParamFromURL(ctx, groupNameParam, "缺少群名", LackOfParameter)
+	if len(retBuf) == 0 && err == nil {
+		ctx.Param[groupNameKey] = groupName
+	}
+	return
+}
+
+func getGroupIntroductionFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
+	groupIntroduction, retBuf, err := getParamFromURL(ctx, groupIntroductionParam, "缺少群介绍", LackOfParameter)
+	if len(retBuf) == 0 && err == nil {
+		ctx.Param[groupIntroductionKey] = groupIntroduction
+	}
+	return
+}
+
+func getGroupAvatarFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
+	groupAvatar, retBuf, err := getParamFromURL(ctx, groupAvatarParam, "缺少群头像", LackOfParameter)
+	if len(retBuf) == 0 && err == nil {
+		ctx.Param[groupAvatarKey] = groupAvatar
 	}
 	return
 }
@@ -213,7 +237,7 @@ func getNotificationSeqFromUrl(ctx *controllers.ProcessContext) (retBuf []byte, 
 }
 
 func getFriendIdAsNotificationReceiver(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
-	ctx.Param[notificationReceiverKey] = ctx.Param[userIdFromTokenKey]
+	ctx.Param[notificationReceiverKey] = ctx.Param[friendIdKey]
 	return
 }
 
@@ -336,6 +360,16 @@ func tellIsSameUserCompareTokenAndUserId(ctx *controllers.ProcessContext) (retBu
 	return
 }
 
+func tellIsSameUserCompareTokenAndFriendId(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
+	var (
+		userIdFromToken = ctx.Param[userIdFromTokenKey].(int64)
+		friendId        = ctx.Param[friendIdKey].(int64)
+	)
+
+	ctx.Param[isSameUserKey] = userIdFromToken == friendId
+	return
+}
+
 func rejectRequestFromOther(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
 	if !ctx.Param[isSameUserKey].(bool) {
 		retBuf, err = errorHandlerHook(IllegalRequestFromMismatched, "非法访问")
@@ -412,7 +446,7 @@ func sendDeleteFriendNotificationToOther(ctx *controllers.ProcessContext) (retBu
 
 func approveFriendRequest(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
 	var (
-		userId                        = ctx.Param[notificationReceiverKey].(int64)
+		userId                        = ctx.Param[userIdFromTokenKey].(int64)
 		seq                           = ctx.Param[notificationSeqKey].(uint64)
 		noti   *entities.Notification = nil
 		chatId                        = int64(0)
@@ -436,12 +470,19 @@ func approveFriendRequest(ctx *controllers.ProcessContext) (retBuf []byte, err e
 		ctx.Param[chatIdKey] = chatId
 		ctx.Param[friendIdKey] = noti.SenderId
 
+		sendNoti := entities.NewNotification(userId, noti.SenderId, entities.Approve, entities.Friend, true, true)
+		sendNoti, err = db.AddAndReturnNotification(mongoTx, sendNoti)
+		if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
+
 		if _, err = controllers.CheckAreUsersFriend(noti.SenderId, noti.ReceiverId, true); err != nil {
 			retBuf, err = errorHandlerHook(InternalError, err.Error())
 			return err
 		}
 
-		SendNotification(noti)
+		SendNotification(sendNoti)
 		return nil
 	})
 	return
@@ -449,20 +490,31 @@ func approveFriendRequest(ctx *controllers.ProcessContext) (retBuf []byte, err e
 
 func refuseFriendRequest(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
 	var (
-		userId = ctx.Param[notificationReceiverKey].(int64)
+		userId = ctx.Param[userIdFromTokenKey].(int64)
 		seq    = ctx.Param[notificationSeqKey].(uint64)
 	)
 
-	noti, err := db.HandleNotification(context.Background(), userId, userId, seq, false)
-	if err == db.MongoErrorNoNotification {
-		retBuf, err = errorHandlerHook(IllegalRequestFromMismatched, "无相关通知")
-		return
-	} else if err != nil {
-		retBuf, err = errorHandlerHook(InternalError, err.Error())
-		return
-	}
+	db.StartDbTransaction(func(mysqlTx *gorm.DB, mongoTx mongo.SessionContext) error {
+		var noti *entities.Notification
+		noti, err = db.HandleNotification(mongoTx, userId, userId, seq, false)
+		if err == db.MongoErrorNoNotification {
+			retBuf, err = errorHandlerHook(IllegalRequestFromMismatched, "无相关通知")
+			return err
+		} else if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
 
-	SendNotification(noti)
+		sendNoti := entities.NewNotification(userId, noti.ReceiverId, entities.Refuse, entities.Friend, true, false)
+		sendNoti, err = db.AddAndReturnNotification(mongoTx, sendNoti)
+		if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
+
+		SendNotification(sendNoti)
+		return nil
+	})
 	return
 }
 
@@ -721,11 +773,19 @@ func approveJoinGroupRequest(ctx *controllers.ProcessContext) (retBuf []byte, er
 			return err
 		}
 
+		sendNoti := entities.NewNotification(groupId, noti.SenderId, entities.Approve, entities.Group, true, true)
+		sendNoti, err = db.AddAndReturnNotification(mongoTx, sendNoti)
+		if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
+
 		if _, err = controllers.CheckIsUserInGroup(noti.SenderId, groupId, true); err != nil {
 			retBuf, err = errorHandlerHook(InternalError, err.Error())
 			return err
 		}
 
+		SendNotification(sendNoti)
 		SendNotification(noti)
 		return nil
 	})
@@ -746,16 +806,29 @@ func refuseJoinGroupRequest(ctx *controllers.ProcessContext) (retBuf []byte, err
 		return
 	}
 
-	noti, err := db.HandleNotification(context.Background(), groupId, userId, seq, false)
-	if err == db.MongoErrorNoNotification {
-		retBuf, err = errorHandlerHook(IllegalRequest, "无相关通知")
-		return
-	} else if err != nil {
-		retBuf, err = errorHandlerHook(InternalError, err.Error())
-		return
-	}
+	db.StartDbTransaction(func(mysqlTx *gorm.DB, mongoTx mongo.SessionContext) error {
+		var noti *entities.Notification
+		noti, err = db.HandleNotification(context.Background(), groupId, userId, seq, false)
+		if err == db.MongoErrorNoNotification {
+			retBuf, err = errorHandlerHook(IllegalRequest, "无相关通知")
+			return err
+		} else if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
 
-	SendNotification(noti)
+		sendNoti := entities.NewNotification(groupId, noti.SenderId, entities.Refuse, entities.Group, true, false)
+		sendNoti, err = db.AddAndReturnNotification(mongoTx, sendNoti)
+		if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		}
+
+		SendNotification(sendNoti)
+		SendNotification(noti)
+		return nil
+	})
+
 	return
 }
 
@@ -782,6 +855,16 @@ func quitOrDeleteMemberFromGroup(ctx *controllers.ProcessContext) (retBuf []byte
 	}
 
 	db.StartDbTransaction(func(mysqlTx *gorm.DB, mongoTx mongo.SessionContext) error {
+		flag := false
+		flag, err = controllers.CheckIsUserInGroup(friendId, groupId, true)
+		if err != nil {
+			retBuf, err = errorHandlerHook(InternalError, err.Error())
+			return err
+		} else if !flag {
+			retBuf, err = errorHandlerHook(UserNotFound, "用户不在群组中")
+			return err
+		}
+
 		err = db.DeleteFromGroup(mysqlTx, friendId, groupId)
 		if err != nil {
 			retBuf, err = errorHandlerHook(InternalError, err.Error())
