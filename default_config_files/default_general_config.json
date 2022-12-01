@@ -29,7 +29,7 @@
     "192.168.199.235:2379"
   ],
 
-  "grpc_serve_address": "a_address_outside.com",
+  "grpc_serve_address": "localhost:1234",
   "grpc_listen_address": "localhost:1234",
 
   "mysql_config": {

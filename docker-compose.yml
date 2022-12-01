@@ -1,0 +1,86 @@
+version: "3"
+
+services:
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "./running:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.2.3
+    ports:
+      - "9092:9092"
+    volumes:
+      - "./running:/bitnami"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
+
+  efak:
+    image: docker.io/trivadis/efak
+    ports:
+      - "8048:8048"
+    environment:
+      - ZKSERVER=zookeeper:2181
+    depends_on:
+      - zookeeper
+      - kafka
+
+  etcd:
+    image: docker.io/bitnami/etcd
+    ports:
+      - "2379:2379"
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+
+  redis:
+    image: docker.io/redis:6.2.7
+    ports:
+      - "6379:6379"
+
+  mysql:
+    image: docker.io/mysql:5.7.40
+    ports:
+      - "3306:3306"
+    volumes:
+      - "./running/mysql:/var/lib/mysql"
+    environment:
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=default_database
+      - MYSQL_USER=not_a_user
+      - MYSQL_PASSWORD=password
+
+  mongo:
+    image: docker.io/mongo:6.0.2
+    ports:
+      - "27017:27017"
+    volumes:
+      - "./running/mongodb:/data/db"
+
+  livechat:
+    image: docker.io/a47451516/livechat:latest
+    ports:
+      - "1234:1235"
+      - "1345:1345"
+      - "5678:5678"
+    volumes:
+      - "./config/default_general_config.json:/appdata/config/config.json"
+    environment:
+      - MONGO_ADDRESS=mongo:27017
+      - MYSQL_ADDRESS=mysql:3306
+      - REDIS_ADDRESS=redis:6379
+      - NOTIFICATION_QUEUE_URL=kafka:9092
+      - MESSAGE_QUEUE_URL=kafka:9092
+      - ETCD_ADDRESS=etcd:2379
+    depends_on:
+      - kafka
+      - etcd
+      - redis
+      - mysql
+      - mongo

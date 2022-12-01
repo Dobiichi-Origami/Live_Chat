@@ -9,35 +9,46 @@ import (
 	"liveChat/http"
 	"liveChat/rpc/rpc_implementation"
 	"liveChat/tcp"
+	"os"
 	"time"
 )
 
 const (
 	configPathArgName = "path"
+
+	mongoAddressENV         = "MONGO_ADDRESS"
+	mysqlAddressENV         = "MYSQL_ADDRESS"
+	redisAddressENV         = "REDIS_ADDRESS"
+	NotificationQueueUrlENV = "NOTIFICATION_QUEUE_URL"
+	MessageQueueUrlENV      = "MESSAGE_QUEUE_URL"
+	EtcdAddressENV          = "ETCD_ADDRESS"
+)
+
+var (
+	mongoAddressVar         string
+	mysqlAddressVar         string
+	redisAddressVar         string
+	notificationQueueUrlVar string
+	messageQueueUrlVar      string
+	etcdAddressVar          string
 )
 
 func main() {
 	path := flag.String(configPathArgName, "", "启动配置文件路径")
 	flag.Parse()
-
+	parseENV()
 	generalConfig := config.NewGeneralConfig(*path)
 
 	go http.InitHttpServer(generalConfig.HttpListenAddresses)
-	time.Sleep(time.Second)
-	http.InitNotificationQueue(generalConfig.NotificationQueueConfig.Urls, generalConfig.NotificationQueueConfig.Topics, generalConfig.NotificationQueueConfig.GroupsId)
-
 	go tcp.InitiateTcpServer(generalConfig.TcpListenAddress)
-	tcp.InitMessageQueue(generalConfig.MessageQueueConfig.Urls, generalConfig.MessageQueueConfig.Topics, generalConfig.MessageQueueConfig.GroupsId)
-
-	db.InitRedisConnection(generalConfig.RedisConfig.Format())
-	db.InitMongoDBConnection(generalConfig.MongoDBConfig.Format(), generalConfig.MongoDBConfig.Database)
-	db.InitMysqlConnection(generalConfig.MysqlConfig.Format())
-
-	fmt.Printf("准备初始化 RPC\n")
 	go rpc_implementation.InitRpcServer(generalConfig.GrpcListenAddress)
 
-	fmt.Printf("准备初始化 RPC链接\n")
-	controllers.InitServerInterconnection(generalConfig.EtcdUrls, generalConfig.GrpcServeAddress)
+	initMessageQueue(generalConfig)
+	initNotificationQueue(generalConfig)
+	initMysql(generalConfig)
+	initRedis(generalConfig)
+	initMongoDb(generalConfig)
+	initEtcd(generalConfig)
 
 	ticker := time.NewTicker(time.Second * 3)
 	for {
@@ -46,4 +57,71 @@ func main() {
 			fmt.Printf("服务器正在运行：%v\n", t)
 		}
 	}
+}
+
+func parseENV() {
+	mongoAddressVar = os.Getenv(mongoAddressENV)
+	mysqlAddressVar = os.Getenv(mysqlAddressENV)
+	redisAddressVar = os.Getenv(redisAddressENV)
+	notificationQueueUrlVar = os.Getenv(NotificationQueueUrlENV)
+	messageQueueUrlVar = os.Getenv(MessageQueueUrlENV)
+	etcdAddressVar = os.Getenv(EtcdAddressENV)
+}
+
+func initNotificationQueue(cfg *config.GeneralConfig) {
+	urlSlice := make([]string, 0)
+	if notificationQueueUrlVar != "" {
+		urlSlice = []string{notificationQueueUrlVar}
+	} else {
+		urlSlice = cfg.NotificationQueueConfig.Urls
+	}
+	http.InitNotificationQueue(urlSlice, cfg.NotificationQueueConfig.Topics, cfg.NotificationQueueConfig.GroupsId)
+}
+
+func initMessageQueue(cfg *config.GeneralConfig) {
+	urlSlice := make([]string, 0)
+	if messageQueueUrlVar != "" {
+		urlSlice = []string{messageQueueUrlVar}
+	} else {
+		urlSlice = cfg.MessageQueueConfig.Urls
+	}
+	tcp.InitMessageQueue(urlSlice, cfg.MessageQueueConfig.Topics, cfg.MessageQueueConfig.GroupsId)
+}
+
+func initRedis(cfg *config.GeneralConfig) {
+	if redisAddressVar != "" {
+		db.InitRedisConnection(redisAddressVar)
+	} else {
+		db.InitRedisConnection(cfg.RedisConfig.Format())
+	}
+}
+
+func initMongoDb(cfg *config.GeneralConfig) {
+	url := ""
+	if mongoAddressVar != "" {
+		url = mongoAddressVar
+	} else {
+		url = cfg.MongoDBConfig.Format()
+	}
+	db.InitMongoDBConnection(url, cfg.MongoDBConfig.Database)
+}
+
+func initMysql(cfg *config.GeneralConfig) {
+	url := ""
+	if mysqlAddressVar != "" {
+		url = mysqlAddressVar
+	} else {
+		url = cfg.MysqlConfig.Format()
+	}
+	db.InitMysqlConnection(url)
+}
+
+func initEtcd(cfg *config.GeneralConfig) {
+	var url []string
+	if etcdAddressVar != "" {
+		url = []string{etcdAddressVar}
+	} else {
+		url = cfg.EtcdUrls
+	}
+	controllers.InitServerInterconnection(url, cfg.GrpcServeAddress)
 }
