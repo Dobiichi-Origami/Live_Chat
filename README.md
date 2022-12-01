@@ -28,7 +28,7 @@ docker-compose up
     + `mysql_config`: Mysql 配置
     + `mongo_db_config`: Mongodb 配置
     + `redis_config`: Redis 配置
-3. docker run -p 1234:1234 -p 1345:1345 -p 5678:5678 -v path/to/config/folder:/appdata/config
+3. `docker run -p 1234:1234 -p 1345:1345 -p 5678:5678 -v path/to/config/folder:/appdata/config`
 
 ## 3. 源码编译
 需要 Golang 版本 1.17.2 及以上
