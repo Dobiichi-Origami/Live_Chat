@@ -1,4 +1,4 @@
-version: "3"
+version: "3.9"
 
 services:
   zookeeper:
@@ -10,6 +10,14 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
 
+  wait_for_zookeeper:
+    image: docker.io/briceburg/docker-compose-wait
+    command:
+      "wait"
+    environment:
+      - WAIT_HOSTS=zookeeper:8080
+      - WAIT_TIMEOUT=120
+
   kafka:
     image: docker.io/bitnami/kafka:3.2.3
     ports:
@@ -20,7 +28,16 @@ services:
       - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
       - ALLOW_PLAINTEXT_LISTENER=yes
     depends_on:
-      - zookeeper
+      wait_for_zookeeper:
+        condition: service_completed_successfully
+
+  wait_for_kafka:
+    image: docker.io/briceburg/docker-compose-wait
+    command:
+      "wait"
+    environment:
+      - WAIT_HOSTS=kafka:9092
+      - WAIT_TIMEOUT=120
 
   efak:
     image: docker.io/trivadis/efak
@@ -29,8 +46,8 @@ services:
     environment:
       - ZKSERVER=zookeeper:2181
     depends_on:
-      - zookeeper
-      - kafka
+      - wait_for_zookeeper
+      - wait_for_kafka
 
   etcd:
     image: docker.io/bitnami/etcd
@@ -63,6 +80,14 @@ services:
     volumes:
       - "./running/mongodb:/data/db"
 
+  wait_for_all_remained:
+    image: docker.io/briceburg/docker-compose-wait
+    command:
+      "wait"
+    environment:
+      - WAIT_HOSTS=etcd:2379, redis:6379, mysql:3306, mongo:27017
+      - WAIT_TIMEOUT=120
+
   livechat:
     image: docker.io/a47451516/livechat:latest
     ports:
@@ -70,17 +95,17 @@ services:
       - "1345:1345"
       - "5678:5678"
     volumes:
-      - "./config/default_general_config.json:/appdata/config/config.json"
+      - "./default_config_files:/appdata/config"
     environment:
-      - MONGO_ADDRESS=mongo:27017
-      - MYSQL_ADDRESS=mysql:3306
-      - REDIS_ADDRESS=redis:6379
+      - MONGO_ADDRESS=mongodb://mongo:27017/default_database
+      - MYSQL_ADDRESS=root:password@tcp(mysql:3306)/default_database?parseTime=true
+      - REDIS_ADDRESS=redis://redis:6379/0
       - NOTIFICATION_QUEUE_URL=kafka:9092
       - MESSAGE_QUEUE_URL=kafka:9092
       - ETCD_ADDRESS=etcd:2379
     depends_on:
-      - kafka
-      - etcd
-      - redis
-      - mysql
-      - mongo
+      wait_for_kafka:
+        condition: service_completed_successfully
+      wait_for_all_remained:
+        condition: service_completed_successfully
+

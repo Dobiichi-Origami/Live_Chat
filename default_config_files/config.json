@@ -30,7 +30,7 @@
   ],
 
   "grpc_serve_address": "localhost:1234",
-  "grpc_listen_address": "localhost:1234",
+  "grpc_listen_address": "0.0.0.0:1234",
 
   "mysql_config": {
     "address_list": [

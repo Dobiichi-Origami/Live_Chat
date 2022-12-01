@@ -1,0 +1,1 @@
+rm -rf ./running/kafka ./running/zookeeper ./running/mysql/* ./running/mongodb/*
