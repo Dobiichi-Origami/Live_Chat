@@ -29,7 +29,7 @@ const (
 	groupIntroductionParam = "groupIntroduction"
 	groupAvatarParam       = "groupAvatar"
 
-	notificationSeqParam = "notificationSeq"
+	notificationSeqParam = "seq"
 
 	tokenHeaderParam = "x-custom-token"
 )

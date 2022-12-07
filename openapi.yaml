@@ -1,0 +1,726 @@
+openapi: 3.0.3
+info:
+  title: Live Chat API 文档
+  description: |-
+    本 API 文档包含了所有 Live Chat 服务端对外暴露出来的接口。目前该文档仍然处于早期建设当中，所有接口均可能随时删除，所以仅供参考。
+  contact:
+    email: a47451516@outlook.com
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.0.1
+servers:
+  - url: "testserver.com"
+    description: "替换为你自己的服务器"
+externalDocs:
+  description: 点此了解更多
+  url: http://swagger.io
+paths:
+  /login:
+    get:
+      tags:
+        - 登录与注册
+      summary: 用户登录接口
+      description: 使用账号密码登录
+      operationId: loginUsersss
+      parameters:
+        - name: account
+          in: query
+          description: "用户登录账号"
+          required: true
+          schema:
+            type: string
+            example: "12345678901"
+        - name: password
+          in: query
+          description: "用户登录密码"
+          required: true
+          schema:
+            type: string
+            example: "this_is_a_password"
+      responses:
+        '200':
+          description: 服务器正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RegisterOrLoginResultBody'
+                  - $ref: '#/components/schemas/FailBody'
+  
+  /register:
+    get:
+      tags:
+        - 登录与注册
+      summary: 用户注册接口
+      description: 用户填写账号、密码、邮箱进行注册
+      operationId: registerUser
+      parameters:
+        - name: account
+          in: query
+          description: "用户账号"
+          required: true
+          schema:
+            type: string
+            example: "12345678901"
+        - name: password
+          in: query
+          description: "用户密码"
+          required: true
+          schema:
+            type: string
+            example: "this_is_a_password"
+        - name: email
+          in: query
+          description: "用户邮箱，用于找回密码"
+          required: true
+          schema:
+            type: string
+            format: email
+            example: "your@email.com"
+      responses:
+        '200':
+          description: 服务器正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/RegisterOrLoginResultBody'
+                  - $ref: '#/components/schemas/FailBody'
+  
+  /userInfo:
+    get:
+      tags:
+        - 用户
+      summary: 获取用户信息
+      description: 使用用户 ID 获取用户信息，当且仅当 ID 与 Token 对应时返回好友与群组信息
+      operationId: getUserInfo
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - name: id
+          in: query
+          description: 查询用户 id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 服务器正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/UserInfoBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/updateUsername:
+    get:
+      tags:
+        - 用户
+      summary: 修改用户名
+      description: 修改 token 所代表用户的用户名
+      operationId: updateUsername
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - name: username
+          in: query
+          description: 新用户名
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/updateUserAvatar:
+    get:
+      tags:
+        - 用户
+      summary: 修改用户头像
+      description: 修改 token 所代表用户的头像
+      operationId: updateUserAvatar
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - name: avatar
+          in: query
+          description:  新头像地址
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/updateUserIntroduction:
+    get:
+      tags:
+        - 用户
+      summary: 修改用户名
+      description: 修改 token 所代表用户的用户介绍
+      operationId: updateUserIntroduction
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - name: introduction
+          in: query
+          description: 新用户介绍
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/addFriend:
+    get:
+      tags:
+        - 用户
+      summary: 向另一个用户发起好友申请
+      operationId: addFriend
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/FriendIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/approveFriendApplication:
+    get:
+      tags:
+        - 用户
+      summary: 同意用户的好友申请
+      operationId: approveFriendApplication
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/SeqParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/FriendshipBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/refuseFriendApplication:
+    get:
+      tags:
+        - 用户
+      summary: 拒绝用户的好友申请
+      operationId: refuseFriendApplication
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/SeqParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /userInfo/deleteFriend:
+    get:
+      tags:
+        - 用户
+      summary: 从好友列表中删除好友
+      operationId: deleteFriend
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/FriendIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo:
+    get:
+      tags:
+        - 群组
+      summary: 获取群信息
+      description: 当且仅当 Token 对应用户在群中返回群成员信息
+      operationId: getGroupInfo
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/GroupInfoBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/createGroup:
+    post:
+      tags:
+        - 群组
+      summary: 创建一个空群
+      operationId: addGroupInfo
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+      requestBody:
+        description: 存放新群组的信息
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                groupName:
+                  type: string
+                groupIntroduction:
+                  type: string
+                groupAvatar:
+                  type: string
+                  format: url
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/deleteGroup:
+    get:
+      tags:
+        - 群组
+      summary: 解散一个群
+      operationId: deleteGroupInfo
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/updateGroupName:
+    get:
+      tags:
+        - 群组
+      summary: 修改群名
+      operationId: updateGroupName
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - name: groupName
+          description: 新群名
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/updateGroupIntroduction:
+    get:
+      tags:
+        - 群组
+      summary: 修改群介绍
+      operationId: updateGroupIntroduction
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - name: groupIntroduction
+          description: 新群介绍
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+          
+  /groupInfo/updateGroupAvatar:
+    get:
+      tags:
+        - 群组
+      summary: 修改群头像
+      operationId: updateGroupAvatar
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - name: groupAvatar
+          description: 新群头像的地址
+          in: query
+          required: true
+          schema:
+            type: string
+            format: url
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/joinGroup:
+    get:
+      tags:
+        - 群组
+      summary: 发送加群申请
+      operationId: joinGroup
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/approveJoinApplication:
+    get:
+      tags:
+        - 群组
+      summary: 同意加群申请
+      operationId: approveJoinApplication
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - $ref: '#/components/parameters/SeqParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'  
+      
+  /groupInfo/refuseJoinApplication:
+    get:
+      tags:
+        - 群组
+      summary: 拒绝加群申请
+      operationId: refuseJoinApplication
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - $ref: '#/components/parameters/SeqParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'  
+      
+  /groupInfo/addAdministrator:
+    get:
+      tags:
+        - 群组
+      summary: 增加管理员
+      operationId: addAdministrator
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - $ref: '#/components/parameters/FriendIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+  
+  /groupInfo/deleteAdministrator:
+    get:
+      tags:
+        - 群组
+      summary: 删除管理员
+      operationId: deleteAdministrator
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - $ref: '#/components/parameters/FriendIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+  /groupInfo/quitOrDeleteMember:
+    get:
+      tags:
+        - 群组
+      summary: 从群聊中退出或踢出
+      operationId: quitOrDeleteMember
+      parameters:
+        - $ref: '#/components/parameters/TokenParam'
+        - $ref: '#/components/parameters/GroupIdParam'
+        - $ref: '#/components/parameters/FriendIdParam'
+      responses:
+        '200':
+          description: 服务端正确收到请求并处理
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SuccessBody'
+                  - $ref: '#/components/schemas/FailBody'
+                  
+components:
+  parameters:
+    TokenParam:
+      name: x-custom-token
+      in: header
+      description: 用户请求凭证
+      required: true
+      schema:
+        type: string
+        example: "this_is_a_token"
+        
+    FriendIdParam:
+      name: friendId
+      in: query
+      description: 对方的用户 id
+      required: true
+      schema:
+        type: integer
+        format: int64
+    
+    GroupIdParam:
+      name: groupId
+      in: query
+      description: 目标群组的 id
+      required: true
+      schema:
+        type: integer
+        format: int64
+        
+    SeqParam:
+      name: seq
+      in: query
+      description: 处理通知的序号
+      required: true
+      schema:
+        type: integer
+          
+  schemas:
+    BasicResponseBodyHeader:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+          example: 200
+          
+    SuccessBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      
+        
+          
+    FailBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      properties:
+        reason:
+          type: string
+          example: "非法请求"
+          
+    RegisterOrLoginResultBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      properties:
+        token:
+          type: string
+          example: "this is a token"
+        
+    UserInfoBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      description: 当 token 不属于该用户时不显示好友与聊天关系
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 0
+        name:
+          type: string
+          example: "live chat"
+        avatar:
+          type: string
+        introduction:
+          type: string
+        friendships:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/Friendship"
+        groupList:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/GroupMember"
+            
+    GroupInfoBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: -1
+        ownerId:
+          type: integer
+          format: int64
+          example: 0
+        name:
+          type: string
+          example: "live group chat"
+        avatar:
+          type: string
+          example: "https://你的图床地址/图片 uri"
+        introduction:
+          type: string
+          example: "这是一段介绍"
+        members:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/GroupMember"
+    
+    MessageBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 0
+        sender:
+          $ref: '#/components/schemas/UserInfoBody'
+        receiver:
+          $ref: '#/components/schemas/UserInfoBody'
+        timestamp:
+          type: integer
+          format: int64
+        contentType:
+          type: integer
+          example: 0
+        content:
+          type: string
+          example: "这是一条信息"
+          
+    ChatSequenceBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 0
+        sequence:
+          type: integer
+          example: 0
+          
+    FriendshipBody:
+      allOf:
+        - $ref: "#/components/schemas/BasicResponseBodyHeader"
+        - $ref: "#/components/schemas/Friendship"
+          
+    Friendship:
+      type: object
+      properties:
+        selfId:
+          type: integer
+          format: int64
+        friendId:
+          type: integer
+          format: int64
+        chatId:
+          type: integer
+          format: int64
+    
+    GroupMember:
+      type: object
+      properties:
+        groupId:
+          type: integer
+          format: int64
+        memberId:
+          type: integer
+          format: int64
+        isAdministrator:
+          type: boolean
+    
+    

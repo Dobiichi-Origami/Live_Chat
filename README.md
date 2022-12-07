@@ -1,7 +1,7 @@
 # Live Chat
 ![GitHub](https://img.shields.io/github/license/Dobiichi-Origami/Live_Chat) ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/Dobiichi-Origami/Live_Chat)
 
-#Live Chat：高可用、高性能即时通讯套件
+# Live Chat：高可用、高性能即时通讯套件
 + 高度可水平拓展
 + 单机高性能
 + 分布式架构
@@ -28,7 +28,7 @@ docker-compose up
     + `mysql_config`: Mysql 配置
     + `mongo_db_config`: Mongodb 配置
     + `redis_config`: Redis 配置
-3. `docker run -p 1234:1234 -p 1345:1345 -p 5678:5678 -v path/to/config/folder:/appdata/config`
+3. `docker run -p 1234:1234 -p 1345:1345 -p 5678:5678 -v path/to/config/folder:/appdata/config a47451516/livechat:latest`
 
 ## 3. 源码编译
 需要 Golang 版本 1.17.2 及以上
