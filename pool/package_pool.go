@@ -36,12 +36,14 @@ type TCPRequestPackage struct {
 	Conn        gnet.Conn
 }
 
-func (p *TCPRequestPackage) SetPackageUsingConn(c gnet.Conn) error {
-	bytesSlice := Get12BytesSlice()
-	defer Put12BytesSlice(bytesSlice)
+var (
+	errorIncompleteRequest  = errors.New("请求不完整")
+	errorMismatchLoadLength = errors.New("负载长度不匹配")
+)
 
-	if errString, status := tools.ReadAndHandleError(c, bytesSlice); status != gnet.None {
-		return errors.New(errString)
+func (p *TCPRequestPackage) SetPackageUsingPayload(bytesSlice []byte, c gnet.Conn) error {
+	if len(bytesSlice) < 12 {
+		return errorIncompleteRequest
 	}
 
 	if binary.BigEndian.Uint16(bytesSlice[0:2]) != constants.MagicNumber {
@@ -53,18 +55,18 @@ func (p *TCPRequestPackage) SetPackageUsingConn(c gnet.Conn) error {
 	}
 
 	requestType := bytesSlice[7]
-	length := tools.BytesToUint32(bytesSlice[8:])
-	contentSlice := make([]byte, length, length)
-
-	if errString, status := tools.ReadAndHandleError(c, contentSlice); status != gnet.None {
-		return errors.New(errString)
+	length := tools.BytesToUint32(bytesSlice[8:12])
+	if length != uint32(len(bytesSlice)-12) {
+		return errorMismatchLoadLength
 	}
 
 	p.Version = bytesSlice[2]
 	p.Ack = make([]byte, 4, 4)
 	copy(p.Ack, bytesSlice[3:7])
 	p.RequestType = requestType
-	p.Load = contentSlice
+	if length != 0 {
+		p.Load = bytesSlice[12:]
+	}
 	p.Conn = c
 	return nil
 }

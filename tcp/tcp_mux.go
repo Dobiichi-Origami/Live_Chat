@@ -2,13 +2,21 @@ package tcp
 
 import (
 	"fmt"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/panjf2000/gnet/v2"
 	"liveChat/constants"
 	"liveChat/controllers"
 	"liveChat/log"
 	"liveChat/pool"
-	"liveChat/tools"
 )
+
+var upgrade = ws.Upgrader{
+	OnHost: func(host []byte) error {
+		// TODO 加入 CORS 判断
+		return nil
+	},
+}
 
 var engine *engineImplementation
 
@@ -22,14 +30,15 @@ func (engine *engineImplementation) OnOpen(c gnet.Conn) (out []byte, action gnet
 		return nil, gnet.Close
 	}
 
-	c.SetContext(pool.GetTCPContext())
 	return nil, gnet.None
 }
 
 func (engine *engineImplementation) OnClose(c gnet.Conn, err error) (action gnet.Action) {
-	ctx := c.Context().(pool.TCPContext)
-	controllers.DeleteConnection(ctx.UserId, ctx.Platform)
-	pool.PutTCPContext(ctx)
+	if c.Context() != nil {
+		ctx := c.Context().(pool.TCPContext)
+		controllers.DeleteConnection(ctx.UserId, ctx.Platform)
+		pool.PutTCPContext(ctx)
+	}
 
 	if err != nil {
 		log.Error(fmt.Sprintf("关闭参数中错误不为空: %s", err.Error()))
@@ -38,18 +47,41 @@ func (engine *engineImplementation) OnClose(c gnet.Conn, err error) (action gnet
 }
 
 func (engine *engineImplementation) OnTraffic(c gnet.Conn) (action gnet.Action) {
-	request := pool.GetRequestPackage()
-	if err := request.SetPackageUsingConn(c); err != nil {
-		pool.PutRequestPackage(request)
-		errInfo := fmt.Sprintf("收到客户端非法请求: %s", err.Error())
-		log.Error(errInfo)
-		err = c.AsyncWrite(tools.GenerateErrorResponseBytes(errInfo), nil)
+	if c.Context() == nil {
+		_, err := upgrade.Upgrade(c)
 		if err != nil {
-			log.Error(fmt.Sprintf("错误处理中异步发送回包失败: %s", err.Error()))
+			return gnet.Close
 		}
-	} else {
-		PushTask(request)
+
+		c.SetContext(pool.GetTCPContext())
+		return gnet.None
 	}
+
+	messages := make([]wsutil.Message, 0)
+	messages, err := wsutil.ReadClientMessage(c, messages)
+	if err != nil {
+		log.Error(err.Error())
+		return gnet.Close
+	}
+
+	for _, m := range messages {
+		switch m.OpCode {
+		case ws.OpPing:
+			wsutil.WriteServerMessage(c, ws.OpPong, nil)
+		case ws.OpClose:
+			c.Close()
+		case ws.OpBinary:
+			request := pool.GetRequestPackage()
+			if err = request.SetPackageUsingPayload(m.Payload, c); err != nil {
+				pool.PutRequestPackage(request)
+				log.Error(fmt.Sprintf("收到客户端非法请求: %s", err.Error()))
+				return gnet.Close
+			} else {
+				PushTask(request)
+			}
+		}
+	}
+
 	return gnet.None
 }
 

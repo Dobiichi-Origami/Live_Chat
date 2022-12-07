@@ -1,9 +1,11 @@
 package tcp
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gobwas/ws/wsutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/panjf2000/gnet/v2"
 	"liveChat/constants"
@@ -50,7 +52,10 @@ func requestAsyncHandler(arg interface{}) {
 			retType = constants.ErrorResponseLoad
 		}
 
-		if err = task.Conn.AsyncWrite(tools.GenerateResponseBytes(retType, task.Ack, retSlice), nil); err != nil {
+		var payload []byte
+		if payload, err = generateWSFrame(retSlice); err != nil {
+			log.Error(fmt.Sprintf("生成 WS 回包失败: %s", err.Error()))
+		} else if err = task.Conn.AsyncWrite(tools.GenerateResponseBytes(retType, task.Ack, payload), nil); err != nil {
 			log.Error(fmt.Sprintf("异步处理中回包失败: %s", err.Error()))
 		}
 
@@ -245,4 +250,14 @@ func addConnection(conn gnet.Conn, userId int64, platform int) bool {
 	}
 
 	return flag
+}
+
+func generateWSFrame(payload []byte) ([]byte, error) {
+	b := make([]byte, 0, len(payload))
+	buffer := bytes.NewBuffer(b)
+	err := wsutil.WriteServerBinary(buffer, payload)
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
 }
