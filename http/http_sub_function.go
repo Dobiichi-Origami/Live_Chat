@@ -83,7 +83,8 @@ const (
 )
 
 type ResponseHeader struct {
-	Status int32 `json:"status"`
+	Status int32  `json:"status"`
+	Reason string `json:"reason"`
 }
 
 type SuccessBody struct {
@@ -92,7 +93,6 @@ type SuccessBody struct {
 
 type FailBody struct {
 	ResponseHeader
-	Reason string `json:"reason"`
 }
 
 type RegisterOrLoginBody struct {
@@ -576,7 +576,7 @@ func getGroupInfoBody(ctx *controllers.ProcessContext) (retBuf []byte, err error
 	}
 
 	err = (&GroupInfoBody{
-		ResponseHeader: ResponseHeader{Success},
+		ResponseHeader: ResponseHeader{Success, ""},
 		GroupInfo:      *info,
 	}).UnmarshalJSON(retBuf)
 	return
@@ -959,7 +959,7 @@ func addOrDeleteAdministrator(ctx *controllers.ProcessContext, isAdd bool) (retB
 }
 
 func returnSuccessBody(ctx *controllers.ProcessContext) (retBuf []byte, err error) {
-	err = (&SuccessBody{ResponseHeader{Success}}).UnmarshalJSON(retBuf)
+	err = (&SuccessBody{ResponseHeader{Success, ""}}).UnmarshalJSON(retBuf)
 	return
 }
 
@@ -978,7 +978,7 @@ func returnUserInfoBody(ctx *controllers.ProcessContext) (retBuf []byte, err err
 	}
 
 	err = (&UserInfoBody{
-		ResponseHeader: ResponseHeader{Success},
+		ResponseHeader: ResponseHeader{Success, ""},
 		UserInfo:       *info,
 	}).UnmarshalJSON(retBuf)
 	return
@@ -992,7 +992,7 @@ func returnFriendshipBody(ctx *controllers.ProcessContext) (retBuf []byte, err e
 	)
 
 	err = (&FriendshipBody{
-		ResponseHeader: ResponseHeader{Success},
+		ResponseHeader: ResponseHeader{Success, ""},
 		Friendship: entities.Friendship{
 			GormModel: gorm.Model{},
 			SelfId:    userId,
@@ -1014,7 +1014,7 @@ func returnGroupInfoBody(ctx *controllers.ProcessContext) (retBuf []byte, err er
 	)
 
 	err = (&GroupInfoBody{
-		ResponseHeader: ResponseHeader{200},
+		ResponseHeader: ResponseHeader{Success, ""},
 		GroupInfo: entities.GroupInfo{
 			Id:           groupId,
 			Owner:        userId,
@@ -1043,7 +1043,7 @@ func returnRegisterOrLoginBody(ctx *controllers.ProcessContext) (retBuf []byte, 
 	)
 
 	err = (&RegisterOrLoginBody{
-		ResponseHeader: ResponseHeader{Success},
+		ResponseHeader: ResponseHeader{Success, ""},
 		Token:          token,
 		UserId:         userId,
 	}).UnmarshalJSON(retBuf)
@@ -1081,8 +1081,7 @@ func errorHandlerHook(statusCode int32, reason string) (retBuf []byte, err error
 	}
 
 	err = (&FailBody{
-		ResponseHeader: ResponseHeader{statusCode},
-		Reason:         reason,
+		ResponseHeader: ResponseHeader{statusCode, reason},
 	}).UnmarshalJSON(retBuf)
 	if err != nil {
 		log.Error(fmt.Sprintf("序列化错误消息发绳错误: %s", err.Error()))

@@ -22,8 +22,8 @@ docker-compose up
 ## 2. Docker
 1. 复制仓库中文件 `default_config_files/config.json` 到本地目录中
 2. 修改以下列表属性值为可使用的配置
-    + `message_queue_config.Urls`: 消息队列中间件地址
-    + `notification_queue_config.Urls`: 消息队列中间件地址
+    + `message_queue_config.Urls`: kafka 中间件地址
+    + `notification_queue_config.Urls`: kafka 中间件地址
     + `grpc_serve_address`: 本机对外可供外部访问的地址（例如域名或集群 IP）
     + `mysql_config`: Mysql 配置
     + `mongo_db_config`: Mongodb 配置
@@ -44,5 +44,9 @@ go build -o liveChat liveChat/main
 2. 同方式2 修改 `default_config_files/config.json`
 3. 执行 `./liveChat --path default_config_files/config.json`
 
+# 项目架构
+## 总架构图
+![](docs/architecture.png)
 
-
+## 简化消息流动图
+![](docs/data_flow.png)

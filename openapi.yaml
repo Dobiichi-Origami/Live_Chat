@@ -44,9 +44,8 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/RegisterOrLoginResultBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/RegisterOrLoginResultBody'
+
   
   /register:
     get:
@@ -84,9 +83,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/RegisterOrLoginResultBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/RegisterOrLoginResultBody'
   
   /userInfo:
     get:
@@ -110,9 +107,8 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/UserInfoBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/UserInfoBody'
+
                   
   /userInfo/updateUsername:
     get:
@@ -135,9 +131,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /userInfo/updateUserAvatar:
     get:
@@ -160,9 +154,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /userInfo/updateUserIntroduction:
     get:
@@ -185,9 +177,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /userInfo/addFriend:
     get:
@@ -204,9 +194,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /userInfo/approveFriendApplication:
     get:
@@ -223,9 +211,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/FriendshipBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/FriendshipBody'
                   
   /userInfo/refuseFriendApplication:
     get:
@@ -242,9 +228,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /userInfo/deleteFriend:
     get:
@@ -261,9 +245,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo:
     get:
@@ -281,9 +263,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/GroupInfoBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/GroupInfoBody'
                   
   /groupInfo/createGroup:
     post:
@@ -313,9 +293,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/deleteGroup:
     get:
@@ -332,9 +310,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/updateGroupName:
     get:
@@ -357,9 +333,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/updateGroupIntroduction:
     get:
@@ -382,9 +356,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
           
   /groupInfo/updateGroupAvatar:
     get:
@@ -408,9 +380,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/joinGroup:
     get:
@@ -427,9 +397,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/approveJoinApplication:
     get:
@@ -447,9 +415,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'  
+                $ref: '#/components/schemas/SuccessBody'
       
   /groupInfo/refuseJoinApplication:
     get:
@@ -467,9 +433,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'  
+                $ref: '#/components/schemas/SuccessBody'
       
   /groupInfo/addAdministrator:
     get:
@@ -487,9 +451,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
   
   /groupInfo/deleteAdministrator:
     get:
@@ -507,9 +469,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
   /groupInfo/quitOrDeleteMember:
     get:
@@ -527,9 +487,7 @@ paths:
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/SuccessBody'
-                  - $ref: '#/components/schemas/FailBody'
+                $ref: '#/components/schemas/SuccessBody'
                   
 components:
   parameters:
@@ -576,22 +534,19 @@ components:
           type: integer
           format: int32
           example: 200
+        reason:
+          type: string
+          example: ""
           
     SuccessBody:
       allOf:
         - $ref: "#/components/schemas/BasicResponseBodyHeader"
       type: object
-      
-        
-          
+
     FailBody:
       allOf:
         - $ref: "#/components/schemas/BasicResponseBodyHeader"
       type: object
-      properties:
-        reason:
-          type: string
-          example: "非法请求"
           
     RegisterOrLoginResultBody:
       allOf:
@@ -601,7 +556,10 @@ components:
         token:
           type: string
           example: "this is a token"
-        
+        userId:
+          type: integer
+          format: int64
+
     UserInfoBody:
       allOf:
         - $ref: "#/components/schemas/BasicResponseBodyHeader"
