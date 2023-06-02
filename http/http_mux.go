@@ -7,6 +7,9 @@ import (
 var httpServer *gin.Engine
 
 const (
+	loginRoute    = "/login"
+	registerRoute = "/register"
+
 	userRouteHead = "/userInfo"
 
 	getUserInfoRoute              = userRouteHead
@@ -36,6 +39,8 @@ const (
 
 func InitHttpServer(addresses []string) {
 	httpServer = gin.Default()
+	httpServer.GET(loginRoute, loginHandler)
+	httpServer.GET(registerRoute, registerHandler)
 	httpServer.GET(getUserInfoRoute, getUserInfoHandler)
 	httpServer.GET(updateUsernameRoute, updateUserNameHandler)
 	httpServer.GET(updateUserAvatarRoute, updateUserAvatarHandler)
